@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cartwheel Scorecard Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #F0ECE9; font-family: 'Inter', system-ui, sans-serif; color: #0F1B1F; font-size: 13px; }
+.header { background: #0F1B1F; padding: 24px 44px 20px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.header h1 { font-family: 'Montserrat', sans-serif; font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 5px; }
+.header p { font-size: 13px; color: #B1A5F7; }
+.header-meta { font-size: 11px; color: #9C9283; text-align: right; line-height: 1.7; }
+.controls { background: #fff; border-bottom: 1px solid #E4E0DC; padding: 11px 44px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.legend-title { font-size: 11px; font-weight: 700; color: #9C9283; text-transform: uppercase; letter-spacing: .7px; white-space: nowrap; }
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; white-space: nowrap; }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+.filter-wrap { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.filter-wrap label { font-size: 12px; font-weight: 600; color: #9C9283; text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
+.filter-wrap select { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: #0F1B1F; background: #F0ECE9; border: 1.5px solid #E4E0DC; border-radius: 6px; padding: 7px 32px 7px 13px; cursor: pointer; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239C9283'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 11px center; outline: none; min-width: 220px; }
+.filter-wrap select:focus { border-color: #394B99; }
+.canvas { padding: 28px 44px 20px; }
+.grid-row { display: grid; grid-template-columns: 112px 1fr; gap: 20px; align-items: start; }
+.layer-label { text-align: right; padding-right: 16px; border-right: 2px solid #E4E0DC; padding-top: 16px; }
+.layer-label .lname { font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; }
+.layer-label .lsub { font-size: 10px; color: #9C9283; margin-top: 3px; line-height: 1.5; }
+.universals { display: flex; gap: 10px; }
+.u-card { flex: 1; background: #394B99; border-radius: 9px; padding: 14px 12px 12px; color: #fff; cursor: pointer; user-select: none; transition: transform .15s, box-shadow .15s, opacity .2s; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.u-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(57,75,153,.35); }
+.u-card.active { transform: translateY(-3px); box-shadow: 0 0 0 3px #A7CF99, 0 8px 20px rgba(57,75,153,.35); background: #2D3D8A; }
+.u-card.dimmed { opacity: .28; }
+.u-num { font-size: 10px; font-weight: 600; opacity: .6; letter-spacing: .5px; margin-bottom: 5px; }
+.u-name { font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 700; line-height: 1.35; }
+.u-pct { font-size: 11px; opacity: .65; margin-top: 6px; }
+.connectors { display: grid; grid-template-columns: 112px 1fr; gap: 20px; }
+.connector-row { display: flex; gap: 10px; }
+.connector { flex: 1; display: flex; justify-content: center; padding: 4px 0; }
+.connector-line { width: 2px; height: 26px; background: linear-gradient(to bottom, #394B99, #D8D2FB); border-radius: 1px; }
+.func-card { background: #fff; border-radius: 10px; border: 1.5px solid #E4E0DC; }
+.func-header { padding: 13px 16px 11px; border-bottom: 1px solid #E4E0DC; }
+.func-title { font-family: 'Montserrat', sans-serif; font-size: 14px; font-weight: 700; }
+.func-sub { font-size: 11px; color: #9C9283; margin-top: 3px; }
+.func-body { padding: 11px 12px 13px; display: flex; flex-direction: column; gap: 8px; }
+.crit { border-radius: 6px; padding: 11px 13px; transition: opacity .2s; position: relative; }
+.crit.dimmed { opacity: .1; }
+.crit-name { font-size: 13px; font-weight: 600; color: #0F1B1F; margin-bottom: 3px; }
+.crit-def { font-size: 11px; color: #9C9283; line-height: 1.5; }
+.crit-wt { font-size: 11px; font-weight: 700; margin-top: 6px; }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.tag { font-size: 10px; font-weight: 600; padding: 2px 9px; border-radius: 20px; display: inline-block; }
+.tag-u1 { background: #EDE9FE; color: #4338CA; }
+.tag-u2 { background: #D3E7CC; color: #26544F; }
+.tag-u3 { background: #F5D3CD; color: #9D2E22; }
+.tag-u4 { background: #D8D2FB; color: #2D3A8C; }
+.tag-u5 { background: #FEF3E2; color: #92400E; }
+.tag-fn { background: #F0ECE9; color: #9C9283; }
+.tag-sa { background: #EDE9FE; color: #4338CA; border: 1px dashed #A5B4FC; }
+.tooltip { display: none; position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 99; background: #0F1B1F; color: #fff; font-size: 12px; line-height: 1.55; padding: 11px 14px; border-radius: 8px; max-width: 300px; min-width: 200px; box-shadow: 0 6px 24px rgba(0,0,0,.3); pointer-events: none; }
+.tooltip strong { display: block; margin-bottom: 5px; color: #B1A5F7; }
+.crit:hover .tooltip { display: block; }
+/* Role tabs */
+.role-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.role-tab { padding: 7px 16px; border-radius: 20px; border: 1.5px solid; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; white-space: nowrap; font-family: 'Inter', sans-serif; }
+.role-tab:hover { opacity: .8; }
+/* Assembled scorecard */
+.assembled { border: 1.5px solid; border-radius: 10px; overflow: hidden; background: #fff; }
+.assembled-head { padding: 13px 16px 11px; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.assembled-title { font-family: 'Montserrat', sans-serif; font-size: 13px; font-weight: 700; }
+.assembled-sub { font-size: 11px; color: #9C9283; }
+.assembled-count { font-size: 11px; color: #9C9283; font-weight: 600; }
+.assembled-section { border-top: 1px solid #E4E0DC; }
+.assembled-section-head { display: flex; align-items: center; gap: 10px; padding: 9px 16px; }
+.assembled-layer-badge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 4px; letter-spacing: .5px; flex-shrink: 0; font-family: 'Montserrat', sans-serif; }
+.assembled-section-title { font-size: 11px; font-weight: 600; color: #9C9283; text-transform: uppercase; letter-spacing: .5px; }
+.assembled-items { padding: 8px 16px 13px; display: flex; flex-direction: column; gap: 6px; }
+.assembled-item { font-size: 12px; color: #0F1B1F; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; line-height: 1.45; }
+.assembled-item-name { flex: 1; }
+.assembled-pct { font-size: 11px; color: #9C9283; font-weight: 600; flex-shrink: 0; }
+.assembled-l3-item .assembled-item-name::before { content: "↳ "; color: #9C9283; }
+/* Gem Scorecard panel */
+.gem-panel { margin-top: 18px; border: 1.5px solid #E4E0DC; border-radius: 10px; background: #fff; overflow: hidden; }
+.gem-panel-head { padding: 13px 16px 11px; border-bottom: 1px solid #E4E0DC; }
+.gem-panel-title { font-family: 'Montserrat', sans-serif; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gem-panel-hint { font-size: 10px; color: #B1A5F7; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.gem-panel-rationale { font-size: 11px; color: #9C9283; margin-top: 4px; line-height: 1.55; }
+.gem-criterion { border-top: 1px solid #F0ECE9; }
+.gem-criterion-head { display: flex; align-items: baseline; justify-content: space-between; padding: 11px 16px 7px; }
+.gem-criterion-name { font-size: 13px; font-weight: 600; color: #0F1B1F; }
+.gem-criterion-wt { font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.gem-rubric { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+.gem-rubric td { padding: 6px 16px; font-size: 12px; vertical-align: top; border-top: 1px solid #F5F2EF; line-height: 1.5; }
+.gem-rubric td:first-child { width: 24px; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: 700; text-align: center; }
+.gem-rubric td:nth-child(2) { width: 120px; font-weight: 600; font-size: 11px; color: #9C9283; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; }
+.gem-rubric td:last-child { color: #2A2A2A; }
+.r5 { color: #26544F !important; } .r4 { color: #394B99 !important; } .r3 { color: #9C9283 !important; } .r2 { color: #B85C1A !important; } .r1 { color: #C04040 !important; }
+/* Gem Scorecard panel */
+.gem-panel { margin-top: 18px; border: 1.5px solid #E4E0DC; border-radius: 10px; background: #fff; overflow: hidden; }
+.gem-panel-head { padding: 13px 16px 11px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid #E4E0DC; }
+.gem-panel-title { font-family: 'Montserrat', sans-serif; font-size: 13px; font-weight: 700; }
+.gem-panel-rationale { font-size: 11px; color: #9C9283; margin-top: 3px; line-height: 1.5; }
+.gem-print-hint { font-size: 10px; color: #B1A5F7; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; flex-shrink: 0; }
+.gem-criterion { border-top: 1px solid #F0ECE9; }
+.gem-criterion-head { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 16px 8px; }
+.gem-criterion-name { font-size: 13px; font-weight: 600; color: #0F1B1F; }
+.gem-criterion-wt { font-size: 11px; font-weight: 700; }
+.gem-rubric { width: 100%; border-collapse: collapse; }
+.gem-rubric td { padding: 7px 16px; font-size: 12px; vertical-align: top; border-top: 1px solid #F5F2EF; line-height: 1.5; }
+.gem-rubric td:first-child { width: 28px; font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 700; text-align: center; white-space: nowrap; }
+.gem-rubric td:nth-child(2) { width: 110px; font-weight: 600; font-size: 11px; white-space: nowrap; }
+.gem-rubric td:last-child { color: #3A3A3A; }
+.gem-rubric tr:nth-child(1) td:first-child { color: #A7CF99; }
+.gem-rubric tr:nth-child(2) td:first-child { color: #7BB8A6; }
+.gem-rubric tr:nth-child(3) td:first-child { color: #9C9283; }
+.gem-rubric tr:nth-child(4) td:first-child { color: #C49A6C; }
+.gem-rubric tr:nth-child(5) td:first-child { color: #C47A1E; }
+/* Callouts */
+.callouts { display: flex; gap: 14px; padding: 14px 44px 0; }
+.callout { flex: 1; background: #fff; border: 1.5px solid #E4E0DC; border-radius: 9px; padding: 15px 18px; }
+.callout h3 { font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: #394B99; margin-bottom: 8px; }
+.callout p { font-size: 12px; color: #9C9283; line-height: 1.6; }
+.footer { text-align: center; font-size: 11px; color: #9C9283; padding: 20px 0 30px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Cartwheel Scorecard Architecture</h1>
+    <p>Three-layer evaluation framework: Cartwheel-wide → Department → Role</p>
+  </div>
+  <div class="header-meta">Cartwheel Talent Acquisition<br>Internal · March 2026</div>
+</div>
+
+<div class="controls">
+  <span class="legend-title">Layers</span>
+  <div class="legend-item"><div class="legend-swatch" style="background:#394B99"></div> Layer 1 — Cartwheel-wide</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#F6F6FC;border:1.5px solid #394B99"></div> Layer 2 — Department module</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#fff;border:1.5px solid #ccc"></div> Layer 3 — Role-specific</div>
+  <div class="filter-wrap">
+    <label for="funcFilter">Department</label>
+    <select id="funcFilter" onchange="filterFunction(this.value)"></select>
+  </div>
+</div>
+
+<div class="canvas">
+  <div class="grid-row">
+    <div class="layer-label"><div class="lname">Layer 1</div><div class="lsub">Cartwheel-wide<br>All roles</div></div>
+    <div class="universals">
+      <div class="u-card" data-uid="u1" onclick="toggle('u1')"><div class="u-num">U1</div><div class="u-name">Mission Conviction</div><div class="u-pct">~15–20%</div></div>
+      <div class="u-card" data-uid="u2" onclick="toggle('u2')"><div class="u-num">U2</div><div class="u-name">Builder's Mindset</div><div class="u-pct">~15–20%</div></div>
+      <div class="u-card" data-uid="u3" onclick="toggle('u3')"><div class="u-num">U3</div><div class="u-name">Communication Across Audiences</div><div class="u-pct">~15–20%</div></div>
+      <div class="u-card" data-uid="u4" onclick="toggle('u4')"><div class="u-num">U4</div><div class="u-name">Cross-Functional Instinct</div><div class="u-pct">~15–20%</div></div>
+      <div class="u-card" data-uid="u5" onclick="toggle('u5')"><div class="u-num">U5</div><div class="u-name">Startup Ambiguity Fit</div><div class="u-pct">~15–20%</div></div>
+    </div>
+  </div>
+  <div class="connectors"><div></div><div class="connector-row"><div class="connector"><div class="connector-line"></div></div><div class="connector"><div class="connector-line"></div></div><div class="connector"><div class="connector-line"></div></div><div class="connector"><div class="connector-line"></div></div><div class="connector"><div class="connector-line"></div></div></div></div>
+  <div class="grid-row">
+    <div class="layer-label"><div class="lname">Layer 2</div><div class="lsub">Department<br>All team members</div></div>
+    <div id="funcCol"></div>
+  </div>
+  <div class="connectors" style="margin-top:4px"><div style="display:flex;align-items:center;justify-content:flex-end;padding-right:16px;"><span style="font-size:16px;color:#D8D2FB;line-height:1">+</span></div><div style="display:flex;align-items:center;padding:6px 0 2px 8px;gap:7px;"><div style="width:2px;height:22px;background:linear-gradient(to bottom,#9C9283,#E4E0DC);border-radius:1px;flex-shrink:0"></div><span style="font-size:10px;color:#9C9283;font-weight:600;text-transform:uppercase;letter-spacing:.6px">Role-specific additions below</span></div></div>
+  <div class="grid-row" style="margin-top:6px">
+    <div class="layer-label"><div class="lname">Layer 3</div><div class="lsub">Assembled<br>Select a role</div></div>
+    <div id="l3Col"></div>
+  </div>
+</div>
+
+<div class="callouts">
+  <div class="callout"><h3>How the layers work together</h3><p>Every scorecard starts with L1 (universals — always present). L2 adds what every person on that team needs to succeed at Cartwheel. L3 adds what's specific to this particular req — seniority, scope, or hard technical requirements that differ between roles in the same department.</p></div>
+  <div class="callout"><h3>Why Mission is standalone in every department</h3><p>Population specificity — Medicaid youth, under-resourced districts — is a discrete screen regardless of function. For SDRs it's a performance differentiator. For engineers it's a retention signal. For Operations, it's the highest-weight criterion.</p></div>
+  <div class="callout"><h3>What Layer 3 tells you</h3><p>L3 is where two reqs in the same department diverge. A Clinical Manager and a Care Coordination Manager share L2. But licensure is a hard gate for one and irrelevant for the other. L3 captures that — don't skip it.</p></div>
+</div>
+<div class="footer">Cartwheel Talent Acquisition · Scorecard Architecture · Internal use only · March 2026</div>
+
+<script>
+const FUNCTIONS = [
+  {
+    id: 'sales',
+    label: 'Sales',
+    color: '#B85C1A',
+    bg: '#FDF4EE',
+    title: 'Sales',
+    sub: 'Generates and qualifies pipeline in K-12 and healthcare markets; brings Cartwheel\'s mission into the field',
+    criteria: [
+      { name: 'Pipeline Generation & Outbound Execution', def: '30–60 daily prospecting activities with direct ownership of meeting and pipeline targets. Cold calling is non-negotiable.', wt: '25%', tags: ['u2','u5'], labels: ['U2 Builder','U5 Ambiguity'], uids: ['u2','u5'], tip: 'Captures U2 + U5 — Sales at Cartwheel means building pipeline in a market without a defined playbook. Volume discipline in ambiguous territory is the core test.' },
+      { name: 'Outreach Craft & Written Communication', def: 'Translates account-level research into personalized, credible outreach. Generic sequence blasting is a disqualifier.', wt: '20%', tags: ['u3','fn'], labels: ['U3 Communication','Function-specific'], uids: ['u3'], tip: 'Captures U3 Communication Across Audiences — translating Cartwheel\'s mission into district-specific language that makes a superintendent lean in.' },
+      { name: 'K-12 / Healthcare Market Credibility', def: 'Understands ed and healthcare buying cycles — credibility, trust, procurement complexity. Not just "open to learning."', wt: '20%', tags: ['u1','fn'], labels: ['U1 Mission','Function-specific'], uids: ['u1'], tip: 'Captures U1 Mission Conviction through market fluency — candidates who understand the stakes of selling into schools bring authentic credibility that converts in longer cycles.' },
+      { name: 'Cross-Functional Partnership', def: 'Co-creates territory plans with AEs. Does not operate as a handoff machine. Keeps CRM current and downstream teams informed.', wt: '15%', tags: ['u4','fn'], labels: ['U4 Cross-Functional','Function-specific'], uids: ['u4'], tip: 'Captures U4 Cross-Functional Instinct — the SDR/AE relationship at Series B is tight co-ownership of territory. Handoff mentality is the failure mode.' },
+      { name: 'Mission Alignment', def: 'Genuine belief in Cartwheel\'s model. Authentic conviction shows up differently on cold calls — it\'s a performance differentiator, not just a culture signal.', wt: '10%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone — for Sales, mission conviction is a performance differentiator. Authentic belief in the problem changes the quality and durability of outreach.' },
+      { name: 'Resilience at Volume', def: 'Handles rejection and silence without losing energy or quality. Sustained performance over time — not just early peaks.', wt: '10%', tags: ['u5'], labels: ['U5 Ambiguity'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — public sector sales has long silences between responses. Candidates who interpret silence as "no" rather than "not yet" burn out or stop executing at the wrong moments.' },
+    ],
+    roles: [
+      {
+        title: 'Sales Development Representative',
+        items: [
+          'Outbound-first: 30–60 daily activities across K-12 district and school administrator personas',
+          'Cold calling non-negotiable; phone-first outreach with email/LinkedIn reinforcement',
+          'EdTech sales background: prior K-12 experience significantly shortens ramp time',
+          'Seasonal cycle awareness: procurement timelines (budget cycles, June close, spring board approvals)',
+          'Former educator/counselor: extra credit for immediate credibility with wellness directors',
+        ],
+        scorecard: {
+          rationale: 'Pipeline generation weighted highest because SDR performance at Cartwheel is a direct function of outbound volume discipline — all other criteria either enable or qualify that output.',
+          anchors: [
+            ['Never owned outbound targets; no prospecting methodology; inbound-only background','Sub-30 daily activities; no personal pipeline metric; cold calling is a last resort','30–40 daily activities; cold calling as primary channel; some personal pipeline ownership','40–50 with clear structure; explains what worked and why in a real territory; documents results','50+ consistently; specific territory strategy by persona; exceeded meeting or pipeline targets with evidence'],
+            ['Cannot produce personalized outreach examples; generic template blasting only','Outreach is competent but undifferentiated; no evidence of K-12 audience research','Some personalization evident; understands K-12 vs. enterprise audience differs; not distinctive','Research-backed messaging; adapts tone per persona; credible K-12/healthcare copy samples','District-specific outreach samples that generated responses; explains per-persona strategy with specificity'],
+            ['No K-12 or healthcare market interest; misframes schools as simple sales targets','Pure SaaS background; "I learn fast" without evidence; would embarrass Cartwheel on a cold call','No direct experience but genuine research depth; credible enough not to be immediately dismissed','Adjacent market experience (EdTech, pediatric health); navigates multi-stakeholder complexity naturally','Direct K-12 or school mental health sales experience; speaks district language without coaching'],
+            ['History of conflict with AEs; no experience in a collaborative SDR/AE model','CRM is an afterthought; operates in isolation; treats handoff as end of responsibility','Has operated in an SDR/AE model; keeps CRM reasonably current; responsive to AE requests','Works proactively with AEs on territory strategy; CRM discipline is personal standard','Tight co-ownership of territory with AEs; every booked meeting treated as a shared conversion'],
+            ['Cannot articulate the mission; treats it as marketing copy','Primarily motivated by comp or career trajectory; mission is incidental','Authentic enough to pass a basic screen; not purely commercially motivated','Genuine belief shows in how they describe the work, not just when asked directly','Speaks about Medicaid youth with specific personal conviction; authenticity would be audible on a cold call'],
+            ['Quit outbound roles quickly; no self-management strategy for rejection','Needs external motivation; performance peaks then drops; burn-out signals in past roles','Demonstrates baseline resilience; hasn\'t quit an outbound role after the first slump','Sustained full-year performance; describes how they reset after a tough quarter','Has managed extended public-sector or healthcare sales cycles with documented steady output during dry stretches'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'success',
+    label: 'School Success',
+    color: '#394B99',
+    bg: '#F6F6FC',
+    title: 'School Success',
+    sub: 'Drives retention, expansion, and partner outcomes across school and district relationships',
+    criteria: [
+      { name: 'Partner Relationship & Account Ownership', def: 'Builds trust with school and district stakeholders across multiple contacts. Owns the health and trajectory of assigned accounts.', wt: '20%', tags: ['u3','u4','fn'], labels: ['U3 Communication','U4 Cross-Functional','Function-specific'], uids: ['u3','u4'], tip: 'Captures U3 + U4 — School Success roles operate across a complex web of district contacts (principals, counselors, admins, superintendents). The expression of cross-audience communication is managing multi-contact accounts without dropping threads.' },
+      { name: 'Revenue & Retention Orientation', def: 'Directly owns renewal, expansion, or both. Connects account outcomes to student access to care — not just quota performance.', wt: '20%', tags: ['u1','fn'], labels: ['U1 Mission','Function-specific'], uids: ['u1'], tip: 'Captures U1 Mission Conviction — revenue at Cartwheel is in service of district outcomes. School Success team members who frame renewal as a quota metric rather than a student access metric are a retention risk.' },
+      { name: 'Data-Informed Decision Making', def: 'Uses usage data, outcomes, and engagement signals to drive partner conversations and internal interventions. Does not rely on gut alone.', wt: '18%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — School Success at Cartwheel requires building data-driven engagement strategies where none existed. Reactive relationship management is the failure mode.' },
+      { name: 'Mission Alignment', def: 'Genuine, durable commitment to serving under-resourced youth and school communities. Not performative.', wt: '15%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 Mission Conviction standalone — population specificity (Medicaid youth, under-resourced districts) is a discrete non-negotiable screen for every School Success team member.' },
+      { name: 'Cross-Functional Communication', def: 'Translates field insights to Product, Clinical, Finance, and Sales. Surfaces patterns from partner interactions that inform company direction.', wt: '15%', tags: ['u3','u4'], labels: ['U3 Communication','U4 Cross-Functional'], uids: ['u3','u4'], tip: 'Captures U3 + U4 — School Success sits at the intersection of the company and its customers. Team members who keep insights siloed instead of routing them internally are a structural problem.' },
+      { name: 'Startup Adaptability', def: 'Operates with ambiguity. Builds playbooks where none exist. Does not wait for a perfect system to execute well.', wt: '12%', tags: ['u5'], labels: ['U5 Ambiguity'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — School Success processes at Cartwheel are still being built. Candidates who need stable systems to perform predictably will struggle in the first 6 months.' },
+    ],
+    roles: [
+      {
+        title: 'Customer Success Manager',
+        items: [
+          'Directly carries GRR number across 40–60 account high-touch portfolio',
+          'Reactive/scaled CS background is a model-mismatch disqualifier',
+          'K-12 district fluency: speaks district language without translation (procurement, strategic plans, Title funding)',
+          'Clinical boundary clarity: strategic partner who deploys clinical nuance — not the clinical lead',
+        ],
+        scorecard: {
+          rationale: 'Revenue and relationship ownership weighted equally because the CSM carries both the GRR number and the account health that drives it — neither functions without the other.',
+          anchors: [
+            ['Scaled/transactional CS only; account ownership concept doesn\'t translate','Reactive relationship management; hasn\'t owned complex multi-stakeholder accounts','Meaningful CS portfolio with real ownership; not a scaled background; some institutional experience','High-touch portfolio with genuine multi-contact ownership; K-12 or institutional experience present','Managed 40–60 high-touch K-12 accounts simultaneously; evidence of turning around deteriorating district relationships'],
+            ['Never measured on revenue outcomes; views CS as purely service-oriented','CS role was support/adoption-focused; revenue accountability was indirect or team-level','Has been measured on retention or renewal; some GRR ownership even if not the primary metric','Clear renewal ownership; connects account health to revenue; understands expansion motion','Directly owned GRR target; can walk through a specific renewal they saved or expanded; frames it as student access, not quota'],
+            ['Has never connected product usage metrics to account strategy','Data is a reporting exercise; waits for data to be presented rather than seeking it','Comfortable with account data; uses it to prep for QBRs; won\'t go into a partner meeting blind','Uses data to prioritize account intervention; pulls and interprets engagement signals proactively','Built a data-driven account health framework; specific examples of usage data changing a partner conversation'],
+            ['Can\'t connect the work to student outcomes; treats mission as marketing copy','Mission secondary to career trajectory; describes Cartwheel as a stepping stone','Authentic interest that holds up under direct questioning; not scripted about why it matters','Genuine, durable belief; articulates why this population specifically matters; not generic "passion for impact"','K-12, Medicaid, or youth-serving background with deep personal commitment; mission durable through comp pressure'],
+            ['Creates information barriers; internal teams don\'t know what\'s happening in their book','Insights siloed in their accounts; minimal internal communication unless required','Communicates across teams when needed; responsive to internal partner requests','Shares partner insights internally without being asked; partners with Clinical and Sales naturally','Proactively routes field insights to Product, Clinical, and Sales; has contributed to roadmap based on partner patterns'],
+            ['Only worked in mature, process-heavy environments; shows frustration with ambiguity','Needs stable processes; references past employer\'s systems as the benchmark','Has worked in a growth-stage company; tolerates ambiguity without losing performance','Comfortable without defined processes; builds structure proactively; doesn\'t wait for a perfect system','Built a CS playbook from scratch at an early-stage company; created processes the team now uses'],
+          ]
+        }
+      },
+      {
+        title: 'Account Management (Dir / Sr Mgr)',
+        items: [
+          'Personally owned a $10M+ GRR/NRR number with forecast rigor across a book',
+          'Builds and scales renewal/expansion playbooks and deal stage frameworks from scratch',
+          'People leadership: manages AMs and manages managers with revenue accountability',
+          'Executive communication: translates portfolio performance into VP/board-level narrative',
+        ],
+        scorecard: {
+          rationale: 'Revenue ownership and relationship management weighted equally at 20% because this role personally carries the GRR number AND leads the team that executes it — weakness in either is a structural failure.',
+          anchors: [
+            ['Account management is relationship-light or SMB-only; never owned accounts at strategic scale','Mid-market experience without VP-level institutional relationship ownership','Meaningful enterprise or AM portfolio with real ownership and some executive access','Managed a significant enterprise portfolio; strong VP-level relationship ownership at institutional scale','Managed $10M+ GRR book across strategic accounts; built and documented multi-contact enterprise relationship playbook'],
+            ['Never owned a revenue number; views retention as a relationship activity, not a financial one','Revenue ownership was team-level or indirect; no personally named number with accountability','Has carried a meaningful GRR number; understands renewal and expansion motion; some playbook building','Owned significant GRR/NRR; has refined renewal and expansion processes; forecast discipline is strong','Personally owned $10M+ GRR/NRR with forecast rigor; built a specific expansion playbook and scaled it'],
+            ['Data-averse; delegates interpretation entirely to ICs','Data is primarily for reporting to leadership rather than driving team decisions','Comfortable with portfolio-level data; uses metrics to manage account health across a team','Uses data to manage team portfolio priorities; data-driven in how they set team strategy','Built portfolio-level health frameworks; specific analytics decisions changed account outcomes at team scale'],
+            ['Can\'t connect portfolio outcomes to student impact; treats mission as HR-speak','Mission incidental; primarily motivated by the commercial opportunity','Authentic interest; mission holds up under direct questioning; not purely commercially motivated','Genuine belief shows in how they describe leading their team; connects team performance to mission outcomes','Deeply connected; frames portfolio performance in student and district outcome terms; mission durable through comp pressure'],
+            ['Operates as a siloed revenue team; no connection between account insights and internal strategy','Cross-functional communication is reactive rather than systematic','Comfortable translating account insights across internal teams; can present portfolio performance to leadership','Partners with Product and Clinical on customer-informed decisions; communicates portfolio at VP level','Built systematic feedback loops between AM team and Product, Clinical, and Finance; translates patterns into board-level narrative'],
+            ['Only worked in large enterprise environments; shows discomfort with team management ambiguity','Has primarily managed teams in mature, process-heavy environments; needs existing infrastructure','Has worked in a growth-stage company with some team-building responsibility','Operated in high-growth environment; builds structure while hitting targets','Built an AM function from scratch; created deal stage framework, renewal playbook, and team management process from zero'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'marketing',
+    label: 'Marketing',
+    color: '#C47A1E',
+    bg: '#FEF9F0',
+    title: 'Marketing',
+    sub: 'Builds Cartwheel\'s brand, generates demand, and translates mission into market-facing narrative for K-12 and healthcare audiences',
+    criteria: [
+      { name: 'Brand Narrative & Content Craft', def: 'Translates Cartwheel\'s mission into compelling, audience-specific content across channels. Writes and edits to a high bar — clinically credible, district-accessible, emotionally resonant.', wt: '25%', tags: ['u3','fn'], labels: ['U3 Communication','Function-specific'], uids: ['u3'], tip: 'Captures U3 Communication Across Audiences — Marketing\'s expression is adapting Cartwheel\'s message across K-12 superintendents, clinicians, Medicaid payers, and policy audiences simultaneously. Generic SaaS marketing copy is the failure mode.' },
+      { name: 'Builder\'s Approach to Market Presence', def: 'Builds brand awareness, content infrastructure, and demand channels from early-stage foundations. Does not inherit a mature system — creates one.', wt: '20%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — at Series B, Marketing is defining Cartwheel\'s category position, content engine, and distribution strategy. Candidates who need an established playbook to execute are a mismatch.' },
+      { name: 'Cross-Functional Campaign Partnership', def: 'Aligns with Sales on pipeline generation, GR on policy narrative, Product on launch messaging, and School Success on customer stories. Does not operate in a marketing silo.', wt: '20%', tags: ['u4','fn'], labels: ['U4 Cross-Functional','Function-specific'], uids: ['u4'], tip: 'Captures U4 Cross-Functional Instinct — effective Marketing at Cartwheel requires Sales feedback loops, School Success case studies, and Product launch coordination running simultaneously. Siloed content strategy is the failure mode.' },
+      { name: 'Performance Measurement & Iteration', def: 'Uses data to evaluate what\'s working. Defines success metrics before launching campaigns. Adjusts based on evidence — not just creative instinct.', wt: '18%', tags: ['u2','u5'], labels: ['U2 Builder','U5 Ambiguity'], uids: ['u2','u5'], tip: 'Captures U2 + U5 — Marketing at a growth-stage company means iterating quickly with incomplete attribution data. Candidates who need clean reporting before adjusting strategy will be too slow.' },
+      { name: 'Mission Alignment', def: 'Genuine commitment to Cartwheel\'s student mental health mission — not just compelling brand copy. Shows up in how they talk about the work, not just what they produce.', wt: '12%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone — Mission alignment in Marketing is both a culture screen and a quality signal. Content produced by someone who deeply believes in the mission reads differently than content produced by someone executing a brief.' },
+      { name: 'Startup Content Velocity', def: 'Produces at startup pace. Moves from brief to published without long review cycles. Ships imperfect things and improves them — does not wait for perfect.', wt: '5%', tags: ['u5'], labels: ['U5 Ambiguity'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — Marketing at a Series B requires high throughput with lean team support. Candidates who need multi-layer approval processes or produce slowly will be a constraint on go-to-market execution.' },
+    ],
+    roles: [
+      {
+        title: 'Content & Brand Marketing',
+        items: [
+          'Thought leadership ownership: whitepapers, blog, case studies, and policy reports that build Cartwheel\'s clinical and educational credibility',
+          'Voice and tone ownership: enforces Cartwheel brand standards across all materials and channels',
+          'Customer story pipeline: partners with School Success to surface and publish district and clinician narratives',
+          'SEO and organic content strategy: builds durable search presence in school mental health category',
+        ],
+        scorecard: {
+          rationale: 'Brand narrative weighted highest because at Cartwheel\'s stage, content quality IS the brand — every piece creates or erodes market position with district and clinical audiences.',
+          anchors: [
+            ['Template-driven; requires heavy editing; can\'t build a brand voice from minimal guidance','Generic SaaS content background; professional but undifferentiated; no mission-driven or regulated industry experience','Competent B2B writer; can learn the K-12 and healthcare nuance with support','Strong portfolio for complex audiences; tone is adaptable and mission-connected; shows audience-specific adaptation','Built brand voice and content system for a mission-driven B2B company from scratch; simultaneously clinically credible and district-accessible'],
+            ['Only executed within mature marketing operations; hasn\'t built anything from scratch','Content execution experience in large, well-resourced teams; needs established infrastructure','Has owned content output in a growth-stage company; comfortable without full team support','Owned content strategy and execution in a resource-lean environment; built repeatable processes','Built a content engine — calendar, process, distribution — at a company where none existed; launched thought leadership with measurable brand impact'],
+            ['Views content as an isolated function; no cross-functional partnerships with GTM or Product','Creates content independently without connecting it to Sales or Product priorities','Comfortable collaborating across teams; responds to cross-functional content requests','Partners naturally with Sales and Product; treats internal stakeholders as co-creators not approvers','Systematic content programs that incorporate Sales feedback, customer stories, and Product launch messaging simultaneously'],
+            ['Has never measured content performance; resistant to data-driven decisions','Performance measurement is an afterthought; no success metrics before launch','Tracks basic metrics; willing to change approach based on evidence','Monitors performance; uses data to prioritize content types; not precious about underperforming content','Defines success metrics before launch; has adjusted content strategy based on performance data and can show what changed'],
+            ['Can\'t articulate why Cartwheel\'s mission is distinctive; treats mental health as a marketing angle','Mission incidental; would produce the same quality content for an unrelated B2B SaaS company','Genuine interest; content samples reflect real engagement with the subject matter','Authentic alignment shows in content quality and vocabulary choices; not performing for the interview','Deeply connected to youth mental health and education equity; content is distinguishable from mission-tourism'],
+            ['Only operated in environments with formal approval processes; pace is a persistent constraint','Requires long review cycles or significant editorial support to publish confidently','Can produce at startup pace when required; doesn\'t let perfect block good','Comfortable with fast turnaround; doesn\'t require multi-layer approval; maintains quality at speed','Ships high-quality content at startup pace — multiple pieces per week — with a clear personal QA process'],
+          ]
+        }
+      },
+      {
+        title: 'Demand Generation / Growth Marketing',
+        items: [
+          'Pipeline contribution: owns marketing-sourced lead targets and tracks conversion to qualified pipeline',
+          'Channel ownership: email, paid, events, LinkedIn — sets strategy and manages execution per channel',
+          'ABM motion: account-based marketing for priority district and health system targets in coordination with Sales',
+          'Attribution and reporting: defines campaign-level success metrics and communicates results to leadership',
+        ],
+        scorecard: {
+          rationale: 'Pipeline contribution weighted highest because it is the direct link between marketing investment and revenue — all other demand gen capabilities exist to serve that outcome.',
+          anchors: [
+            ['Demand gen copy is generic SaaS; can\'t adapt tone for district or clinical buyer personas','No evidence of audience-specific adaptation; professional but not distinctive for K-12','Competent demand gen copywriter; can learn the K-12 audience context quickly','Strong copy for complex B2B audiences; understands how to adapt brand narrative for demand gen formats','Produces mission-connected, audience-specific demand gen copy that is distinguishable from generic SaaS in landing pages and emails'],
+            ['Has only executed within mature, fully-built demand gen systems; built nothing from scratch','Demand gen experience primarily in large teams with existing infrastructure and substantial budget','Has owned demand gen execution in a growth-stage company; comfortable without full martech support','Owned demand gen in a resource-lean environment; built repeatable multi-channel processes','Built a demand gen engine from scratch — channel strategy, tech stack, attribution model — at a company where none existed'],
+            ['History of Sales-Marketing misalignment; treats demand gen as a marketing-only function','Demand gen planned and executed independently; Sales finds out about campaigns at launch','Not running programs in isolation; collaborates with Sales and SDR on basic campaign alignment','Works proactively with Sales on pipeline targeting; campaigns designed with AE input; attribution shared','Ran ABM programs in tight coordination with Sales; built feedback loops between campaign performance and sales territory strategy'],
+            ['Has never connected demand gen activity to pipeline outcomes; resists measurement frameworks','Reports on vanity metrics (impressions, clicks) without connecting to pipeline; attribution murky','Monitors key demand gen metrics; willing to shut off underperforming channels','Tracks campaign-level performance through pipeline contribution; adjusts channel mix based on evidence','Built full-funnel attribution model; tracks MQL-to-close by channel; has made major channel strategy pivots based on data'],
+            ['Treats mission as a brand attribute to leverage, not a genuine commitment','Can\'t articulate why Cartwheel\'s mission is distinctive; would produce identical work for another SaaS','Authentic enough that mission-connected messaging feels natural rather than forced','Genuine alignment shows in how they describe priorities and what campaigns they\'d build first','Deeply committed; K-12 and healthcare audiences can feel the difference between authentic advocacy and demand gen performance'],
+            ['Only operated with formal quarterly planning cycles; pace has been a persistent constraint','Requires extensive pre-launch planning; doesn\'t iterate based on live data','Can operate at startup pace; not reliant on long planning cycles to execute','Moves fast; doesn\'t over-engineer campaigns; iterates based on live performance data','Launched multiple campaigns per month at startup pace; comfortable with rapid iteration and channel shutoffs'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'finance',
+    label: 'Finance',
+    color: '#26544F',
+    bg: '#F2F7F3',
+    title: 'Finance',
+    sub: 'Financial modeling, planning, and revenue infrastructure that enables confident decision-making at scale',
+    criteria: [
+      { name: 'Financial & Revenue Modeling Rigor', def: 'Builds models and analytical infrastructure from scratch — structure, assumptions, sensitivity, scenario-building. Disciplined on prediction and variance analysis.', wt: '25%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — Finance\'s version of "building from scratch" is constructing model infrastructure, ERP processes, and revenue reporting frameworks where none existed. RevOps expression: CRM data architecture and deal desk process design.' },
+      { name: 'Cross-Functional Communication', def: 'Translates financial and revenue complexity to clinical, ops, and GTM partners. Enables decisions — does not gatekeep.', wt: '20%', tags: ['u3','u4'], labels: ['U3 Communication','U4 Cross-Functional'], uids: ['u3','u4'], tip: 'Captures U3 + U4 — Finance and RevOps are both internal service functions. The failure mode is being a bottleneck rather than an enabler. Translating complexity without jargon is the shared expression.' },
+      { name: 'Healthcare Business Model Fluency', def: 'Understands Medicaid economics, 1099 provider models, reimbursement complexity, and how Cartwheel\'s GTM translates into recognized revenue.', wt: '20%', tags: ['fn'], labels: ['Function-specific only'], uids: [], tip: 'Function-specific only — Medicaid economics and revenue cycle dynamics are hard requirements for Finance. For RevOps, this means understanding how the GTM motion produces recognized revenue and how to report on it accurately.' },
+      { name: 'Startup Ambiguity Fit', def: 'Comfortable with incomplete data and iterating on assumptions. Builds infrastructure where none exists and adapts quickly as the business model evolves.', wt: '20%', tags: ['u5','fn'], labels: ['U5 Ambiguity','Function-specific'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — Finance and RevOps at a Series B means creating the standards rather than following them. Candidates who need institutional stability to function will struggle as the model evolves rapidly.' },
+      { name: 'Mission Alignment', def: 'Genuine connection to Cartwheel\'s mission — not incidental to a finance or ops career move.', wt: '15%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone. Notable for non-client-facing roles — signals Cartwheel holds mission as a real discrete screen even in Finance and RevOps. Retention risk when absent: candidates defect to higher-comp ops roles during financial pressure periods.' },
+    ],
+    roles: [
+      {
+        title: 'Finance / FP&A',
+        items: [
+          'Controller scope: GAAP mastery, external audit experience, ERP implementation ownership — hard gates',
+          'Strategic Finance scope: board-level communication, PE/banking analytical pedigree, COO-level recommendations',
+          'FP&A: Excel modeling floor, 1099 economics fluency, ops and clinical stakeholder partnership',
+          'Scenario-planning and sensitivity analysis at board level; variance explanation as a communication skill',
+        ],
+        scorecard: {
+          rationale: 'Financial modeling rigor weighted highest because the primary reason this role exists is to provide confident analytical infrastructure for leadership decisions — without that foundation, the other competencies have nothing to operate on.',
+          anchors: [
+            ['Analysis skills don\'t include model-building; has only worked with pre-built models','Excel-competent but model architecture is borrowed; hasn\'t owned a full financial model end-to-end','Solid modeling skills; can build a functional model from scratch; some exposure to complex revenue models','Strong modeling background; builds structured, assumption-driven models; has owned external audit prep or board-level presentations','Built board-level financial models from scratch in a healthcare or tech company; owns scenario and sensitivity modeling with documented forecast accuracy'],
+            ['Finance output requires translation by a third party; can\'t simplify without losing accuracy','Communication is primarily internal to finance; struggles to make models accessible to operational leaders','Comfortable presenting financial findings to non-finance audiences; not purely a back-office operator','Clear communicator to non-finance stakeholders; enables decisions proactively rather than just reporting','Served as strategic finance partner to clinical, ops, and GTM leaders simultaneously; sought out for guidance, not just numbers'],
+            ['No healthcare finance exposure; 6+ months to become functional in Cartwheel\'s revenue model','Pure tech or SaaS finance background; healthcare business model is conceptually understood but not operational','Healthcare adjacent; understands the basics of Medicaid economics and can learn specifics with support','Solid healthcare finance background with Medicaid or payer-side experience; understands GTM-to-revenue flow','Deep working knowledge of Medicaid economics, 1099 provider models, EPSDT, and multi-state reimbursement complexity'],
+            ['Needs institutional infrastructure to function; would be a bottleneck in a rapidly evolving model','Best work is in mature, process-rich environments; discomfort when historical data or established processes are absent','Has worked at a growth-stage company; tolerates incomplete data; can build with imperfect information','Has operated effectively in high-growth environment; built processes while executing against them','Built Finance function from scratch at a growth-stage company — ERP, financial policies, forecasting cadence all initiated without precedent'],
+            ['Can\'t connect financial work to patient or student outcomes; treats mission as irrelevant','Mission incidental; primarily motivated by career trajectory or compensation','Genuine interest; not purely financially motivated; mission holds up under direct questioning','Authentic alignment; can articulate why working in healthcare access matters to them specifically','Genuine, durable connection; frames financial decisions in terms of access and outcomes, not just P&L; mission holds through comp pressure from PE/banking alternatives'],
+          ]
+        }
+      },
+      {
+        title: 'Revenue Operations Analyst',
+        items: [
+          'Salesforce proficiency: CRM navigation, record management, reporting — day-one hard requirement, cannot be trained post-hire',
+          'Deal desk execution: end-to-end opportunity closing with <24hr turnaround under volume pressure',
+          'Documentation ownership: builds Guru SOPs for all revenue workflows (explicit 12-month success metric)',
+          'Frees Director capacity for strategy — candidates who need heavy oversight recreate the bottleneck problem',
+        ],
+        scorecard: {
+          rationale: 'Financial modeling rigor (CRM/revenue infrastructure) weighted highest because Salesforce discipline and deal desk execution are the primary performance levers — if CRM data and deal velocity fail, the entire revenue infrastructure breaks down.',
+          anchors: [
+            ['Has never worked with Salesforce in a revenue operations context; CRM is not a native tool','Salesforce proficiency is surface-level; relies on admin support for anything beyond basic navigation','Proficient in Salesforce navigation, record management, and basic reporting; has worked with CRM data in a revenue-facing role','Strong Salesforce reporting and data management; understands how CRM data translates into revenue analytics; can build pipeline visibility dashboards','Builds Salesforce reports and CRM data architecture that gives leadership accurate pipeline and forecast data; owns the system of record for revenue metrics'],
+            ['Has caused revenue delays through poor cross-functional communication in previous roles','Communication is reactive; stakeholders have to chase status; creates ambiguity by not proactively updating','Communicates effectively across the revenue process; responsive to cross-functional requests','Proactively communicates deal status across teams; creates clarity rather than requiring it','Connective tissue between Sales, Finance, and Legal on deal execution; translates deal complexity into clear next steps for every stakeholder simultaneously'],
+            ['No B2B revenue operations experience; doesn\'t understand the CRM-to-financial-reporting connection','RevOps background is in a simpler, transactional business model; hasn\'t dealt with multi-year district contracts','Understands basic B2B SaaS revenue operations; can learn the healthcare and education-specific nuances with support','Solid understanding of B2B SaaS revenue mechanics with some healthcare context; understands contract-to-revenue-recognition flow','Understands exactly how Cartwheel\'s GTM motion produces recognized revenue; has mapped a healthcare or education SaaS deal structure end-to-end'],
+            ['Requires existing infrastructure to function; would recreate the bottleneck problem this role was designed to solve','Best work is in mature RevOps environments with established deal desk infrastructure','Has worked in a growth-stage company; can operate without perfect process support; builds documentation proactively','Comfortable building processes in a resource-lean environment; has owned systems that didn\'t exist before they arrived','Built RevOps infrastructure from scratch — deal desk process, documentation system, revenue reporting cadence — at a company where none existed'],
+            ['Can\'t connect RevOps work to patient or student outcomes','Mission incidental; primarily motivated by career trajectory or compensation','Genuine interest; not purely commercially motivated; mission holds under direct questioning','Authentic alignment; not just doing RevOps at Cartwheel because it\'s available','Genuine connection; understands that deal desk efficiency directly affects how many districts get access to Cartwheel services; mission durable through comp pressure from higher-paying SaaS RevOps roles'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'eng',
+    label: 'Engineering',
+    color: '#2D4E6B',
+    bg: '#F3F6F9',
+    title: 'Engineering',
+    sub: 'Builds the platform that powers school-based mental health care at scale',
+    criteria: [
+      { name: 'Technical Ownership & Delivery', def: 'Owns end-to-end development — conception to production. Proven track record of shipping with measurable impact, not just completing tickets.', wt: '25%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — Cartwheel\'s engineers own from inception to delivery. "Proven track record of delivering products with measurable business impact" is a hard requirement in the JD.' },
+      { name: 'Product Empathy & Human-Centered Build', def: 'Builds for real users — school counselors, clinicians, district admins. UX thinking is built in, not bolted on.', wt: '20%', tags: ['u3','fn'], labels: ['U3 Communication','Function-specific'], uids: ['u3'], tip: 'Captures U3 Communication Across Audiences — the engineering expression is building software that the end user (a school counselor, a clinician) can actually use, not just software that works technically.' },
+      { name: 'Startup Autonomy & Structural Comfort', def: '"Comfortable creating your own structure." At Cartwheel\'s stage, engineers define the standards rather than follow them.', wt: '20%', tags: ['u5','fn'], labels: ['U5 Ambiguity','Function-specific'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — the SWE JD is explicit: "comfortable creating your own structure, wrangling stakeholders, making decisions with imperfect information."' },
+      { name: 'Cross-Functional Operating Style', def: 'Drives alignment across Product, Design, Clinical, and Ops. Translates technical constraints into business-facing decisions.', wt: '15%', tags: ['u4','fn'], labels: ['U4 Cross-Functional','Function-specific'], uids: ['u4'], tip: 'Captures U4 Cross-Functional Instinct — the EM JD explicitly calls out "navigating complex dependencies" and "driving alignment across departments."' },
+      { name: 'Systems Thinking & Technical Quality Bar', def: 'Evaluates technical debt, architectural trade-offs, and long-term maintainability — not just sprint delivery.', wt: '10%', tags: ['u2'], labels: ['U2 Builder'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset from a different angle — building durable systems, not just features. EM JD: "regularly evaluate technical debt and system architecture."' },
+      { name: 'Mission Alignment', def: 'Unshakable desire to work on the student mental health problem — not just an interesting engineering challenge.', wt: '10%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone. The SWE JD uses the word "unshakable." Engineering candidates who don\'t connect to the student mental health problem tend to be pulled toward higher-comp offers early.' },
+    ],
+    roles: [
+      {
+        title: 'Senior Software Engineer',
+        items: [
+          'Ruby on Rails depth non-negotiable; Hotwire, Tailwind, and API design experience',
+          'Accessible design and localization a strong plus; Spanish/Portuguese fluency valuable for the student population',
+          'Leads technical design for feature areas; strong testing practices and code review standards',
+          'HIPAA/sensitive data handling increasingly critical as Cartwheel scales',
+        ],
+        scorecard: {
+          rationale: 'Technical ownership and delivery weighted highest because Cartwheel engineers own from conception to production — that accountability cannot be compensated for by other strengths.',
+          anchors: [
+            ['History of incomplete delivery or tickets-only mindset; has never been accountable for a shipped product','Primarily executes on defined tickets; ownership stops at code review; hasn\'t driven a feature from design to production independently','Has shipped meaningful features end-to-end; understands full lifecycle ownership even if scope was limited','Strong track record of complete feature delivery with documented impact; takes ownership of the full lifecycle','End-to-end ownership with measurable business impact at a healthcare or EdTech company; owns quality bar for their area'],
+            ['Has shipped features that required major re-work due to usability oversights; user impact not considered','UX is Design\'s problem; builds technically correct features that need significant UX iteration','Understands technical correctness isn\'t sufficient; collaborates with Design and incorporates user feedback','Proactively identifies usability gaps; works closely with Design without needing to be directed','Built features directly with school counselors or clinicians as primary users; specific UX decisions made to reduce friction for non-technical users'],
+            ['Requires detailed requirements and existing architectural patterns to perform; bottleneck in current environment','Best work is in environments with well-defined specs and established technical standards; ambiguity causes slowdown','Comfortable working without fully-defined requirements; can function without a complete tech spec','Creates structure where none exists; makes confident technical decisions with incomplete information','Thrived as an early engineer at growth-stage company; created technical standards and patterns the team now uses'],
+            ['Creates technical silos; non-technical stakeholders don\'t understand what engineering is doing or why','Cross-functional communication happens only when required; doesn\'t proactively manage dependencies','Comfortable with non-technical stakeholders; communicates technical decisions accessibly; doesn\'t create silos','Partners naturally across functions; proactively communicates constraints before they become blockers','Drives alignment across Product, Design, Clinical, and Ops; translates technical constraints into business-facing decisions'],
+            ['Has left significant technical debt requiring major remediation; never engages with architectural concerns','Optimizes for speed at expense of maintainability; technical debt accumulates without acknowledgment','Considers maintainability in code review; flags technical debt when encountered','Thinks beyond sprint delivery; raises technical debt concerns before they compound; contributes to architectural decisions','Proactively proposes technical debt remediation; architectural decisions made with explicit long-term reasoning; team code quality improves in their area'],
+            ['Can\'t connect engineering work to student outcomes; would describe mission as a marketing differentiator','Primarily motivated by technical complexity or career trajectory; mission is incidental','Genuine interest in the problem; not just seeking an interesting engineering challenge','Authentic alignment; engineering work for Cartwheel feels personally meaningful, not just technically interesting','Genuine specific conviction about the student mental health problem; would stay through competing offers because of the mission'],
+          ]
+        }
+      },
+      {
+        title: 'Engineering Manager',
+        items: [
+          'Leads 4–8 engineers; owns delivery cadence, team health, and career development',
+          'Balances people management with technical credibility; translates complexity to the CTO',
+          'Cross-functional dependency management at org scale; partners with Product and Design on roadmap',
+          'Drives hiring, onboarding, and retention — team-building is a first-class responsibility',
+        ],
+        scorecard: {
+          rationale: 'Technical ownership and delivery weighted highest because the EM owns both people and output — an EM who manages people but can\'t maintain delivery cadence is a half-solution.',
+          anchors: [
+            ['Has managed teams but can\'t demonstrate delivery outcomes; accountability rested with the team, not the EM','Engineering management experience is primarily coordination without delivery accountability','Has managed engineering delivery with real accountability; understands the difference between managing and coordinating','Strong delivery track record as an EM; owns sprint cadence and team output; has navigated complex cross-team dependencies','Led a team of 4–8 engineers to consistently deliver in a healthcare or EdTech environment; shields the team from noise while maintaining output predictability'],
+            ['Has managed teams that shipped features users couldn\'t use; doesn\'t consider user impact a management concern','Product empathy is the PM\'s responsibility; team is execution-focused','Values product quality; ensures team doesn\'t ship technically correct but unusable features','Cultivates product empathy in their team; proactively engages with Design and Product without needing to be invited','Builds teams with a user-first culture; instilled product thinking in engineers; partners with Product and Design as a true thought partner on roadmap tradeoffs'],
+            ['Has only managed in large, mature engineering teams with fully established processes; ambiguity causes dysfunction','Best work is in mature engineering organizations with defined career ladders and stable processes','Has managed in a growth-stage company; comfortable with organizational ambiguity','Operated as an EM in a high-growth environment; built process and culture simultaneously with shipping product','Built an engineering team at a growth-stage company — hiring, onboarding, technical standards, and career frameworks all created from scratch'],
+            ['Creates tension with Product or other functions; non-technical stakeholders feel blocked by engineering','Cross-functional relationships are adequate but reactive; dependencies managed at the last minute','Comfortable with non-technical stakeholders; translates technical complexity accessibly; manages dependencies when asked','Partners naturally across functions; manages cross-team dependencies proactively; represents engineering without creating adversarial dynamics','Driven alignment across Product, Design, Clinical, and Ops on multi-quarter roadmaps; translates engineering constraints into decisions at VP and CTO level'],
+            ['Has led teams that accumulated significant technical debt without intervention; architectural health is the IC\'s responsibility','Technical debt is acknowledged but consistently deprioritized; delivery pressure always wins','Understands the technical debt conversation; allocates sprint capacity to architectural health without being prompted','Regularly evaluates technical debt and architectural health; makes roadmap trade-offs that include technical investment','Has led architectural reviews, technical debt prioritization, and system scalability planning; specific decisions paid long-term dividends'],
+            ['Can\'t connect team management to student outcomes; describes mission as a retention tool','Mission incidental; primarily motivated by career trajectory, team size, or technical scope','Authentic interest; would stay at Cartwheel through a competing offer because of the mission','Genuine alignment; describes mission as a real reason they\'re drawn to the role, not a talking point','Builds a team culture rooted in Cartwheel\'s mission; instills in engineers that they\'re building for kids in crisis, not just shipping tickets'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'data',
+    label: 'Data & Analytics',
+    color: '#5C3D99',
+    bg: '#F7F4FD',
+    title: 'Data & Analytics',
+    sub: 'Turns Cartwheel\'s data into decisions — from clinical outcomes to product engagement to revenue',
+    criteria: [
+      { name: 'Analytical Architecture & Data Modeling', def: 'Designs durable data models, semantic layers, and metric definitions — not just queries. Builds the foundation others build on.', wt: '25%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — the data version of "building from scratch" is constructing analytical infrastructure (dbt models, semantic layers, shared metric stores) where none existed.' },
+      { name: 'Stakeholder Translation & Decision Enablement', def: 'Translates business questions into analytical frameworks. Communicates complex findings to clinical, ops, product, and finance partners.', wt: '20%', tags: ['u3','u4'], labels: ['U3 Communication','U4 Cross-Functional'], uids: ['u3','u4'], tip: 'Captures U3 + U4 — at Cartwheel, data serves clinical, ops, product, and finance simultaneously. The analyst who translates across all four without losing rigor is the signal.' },
+      { name: 'Data Quality Ownership & Governance', def: 'Builds testing strategies, documentation, and governance where none exist. Makes defensible analytical decisions with incomplete data.', wt: '20%', tags: ['u5','fn'], labels: ['U5 Ambiguity','Function-specific'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — data governance at a growth-stage health company means creating the standards, not following them.' },
+      { name: 'Healthcare & Education Domain Fluency', def: 'Understands patient outcomes, student performance metrics, Medicaid data sensitivity, HIPAA context, school district measurement frameworks.', wt: '20%', tags: ['fn'], labels: ['Function-specific only'], uids: [], tip: 'Function-specific only — healthcare data has specific regulatory, sensitivity, and contextual requirements that general analytics background doesn\'t address.' },
+      { name: 'Proactive Problem Framing', def: 'Reframes metrics, challenges requirements, shapes what gets measured. The differentiator between "senior" and "good analyst who executes well."', wt: '10%', tags: ['u2'], labels: ['U2 Builder'], uids: ['u2'], tip: 'From the Senior DA debrief: "instinct to shape requirements, not just execute them." Reactive posture confirmed independently across two interviewers is a disqualifying pattern.' },
+      { name: 'Mission Alignment', def: 'Genuine connection to improving youth mental health outcomes — not just an analytics career move.', wt: '5%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone at lower weight — the Principal DA JD opens with it explicitly. Data choices at Cartwheel have direct clinical implications.' },
+    ],
+    roles: [
+      {
+        title: 'Senior Data Analyst',
+        items: [
+          'Execution-heavy embedded analytics; self-service tooling ownership; trusted cross-functional advisor',
+          'Strong SQL; proficient with BI tools (Looker, Hex, or equivalent)',
+          'Strategic instinct must be present — reactive posture is the confirmed failure mode per debrief data',
+          'Serves multiple stakeholders simultaneously; comfort with competing analytical priorities',
+        ],
+        scorecard: {
+          rationale: 'Analytical architecture weighted highest because without infrastructure, every analysis is a one-off — the Senior DA builds the foundation that enables self-service analytics and scalable decision-making across all teams.',
+          anchors: [
+            ['Analysis is always query-level; no awareness of or interest in data modeling','Primarily ad hoc analysis; builds queries that work once but don\'t scale; hasn\'t thought about infrastructure ownership','Strong SQL and some data modeling experience; understands the difference between a one-off query and a durable model','Has contributed meaningfully to data infrastructure beyond ad hoc analysis; thinks about reusability and consistency','Has designed and built durable dbt models or semantic layer infrastructure that other analysts and stakeholders build on; owns the metric definitions the company runs off of'],
+            ['Has produced analyses that decision-makers couldn\'t use; only comfortable communicating within data teams','Data communication is primarily technical; outputs require significant interpretation by the business stakeholder','Comfortable presenting findings to non-technical stakeholders; can translate complexity without condescending','Strong communicator to diverse audiences; knows how to tailor the same analysis for a clinician and a CFO','Serves clinical, ops, product, and finance stakeholders simultaneously; produces analyses that drive decisions rather than inform reviews'],
+            ['Has shipped analyses with material data quality issues that affected decisions','Data quality is someone else\'s problem; presents outputs without surfacing known limitations','Aware of data quality concerns; flags issues when encountered; doesn\'t present analysis as definitive when it isn\'t','Builds data quality checks into their work proactively; documents model assumptions','Built testing strategies, data documentation, and governance frameworks where none existed; makes defensible decisions with incomplete data and communicates assumptions explicitly'],
+            ['No healthcare or education data experience and no particular interest in the domain','Pure tech or consumer data background; healthcare data constraints would require significant ramp time','Adjacent experience; understands basics of healthcare data sensitivity; can learn the specific domain with support','Solid healthcare or education data background; understands regulatory and sensitivity constraints; can navigate HIPAA requirements in analysis design','Deep working knowledge of patient outcome metrics, Medicaid data sensitivity, HIPAA handling, and school district measurement frameworks; has worked with clinical or educational data in a compliance-aware environment'],
+            ['Has never pushed back on an analytical request; treats all requests as equally valid','Primarily executes requests as stated; interprets requirements literally without interrogating the underlying question','Shows some instinct for questioning requirements; occasionally reframes; doesn\'t just execute as stated','Challenges requirements when the question is wrong; proposes better frameworks before diving in','Has proactively reshaped analytical questions in ways that changed the direction of a business decision; pushes back on poorly-framed requests and reframes with better structure'],
+            ['Can\'t connect data decisions to patient or student outcomes','Mission incidental; would produce the same quality of work for an unrelated analytics role','Genuine interest; not purely motivated by interesting data problems','Authentic alignment; can articulate why data work in healthcare matters differently than in consumer tech','Sees data decisions at Cartwheel as having direct clinical implications; brings genuine care about student outcomes to choices about what to measure and how'],
+          ]
+        }
+      },
+      {
+        title: 'Principal Data Analyst',
+        items: [
+          'Staff-level technical ownership; close thought partner to Director of Data',
+          'Defines "what great looks like" for the whole team — architecture ownership is the differentiator',
+          'Statistical depth: experimental design, significance testing, outcome measurement frameworks',
+          'Shapes what Cartwheel measures and how it reports clinical and educational outcomes',
+        ],
+        scorecard: {
+          rationale: 'Analytical architecture weighted highest because the Principal role exists to define Cartwheel\'s data infrastructure and metric standards — not to produce individual analyses, but to build the system that makes every other analyst\'s work more reliable.',
+          anchors: [
+            ['Analytical depth is at the ad hoc or senior analyst level; no infrastructure ownership or interest','Strong individual analyst who produces excellent work but hasn\'t owned infrastructure or architectural decisions','Strong data modeling background; can take ownership of infrastructure decisions even if not yet at staff level','Staff-level data infrastructure ownership; has made architectural decisions with long-term implications that proved correct','Has designed and owned a complete analytics infrastructure — dbt, semantic layer, testing strategy, documentation standards, metric governance — at a growth-stage company; the person the team defers to on architectural decisions'],
+            ['Communication effectiveness drops significantly with senior non-technical stakeholders','Strongest in peer-to-peer technical collaboration; senior stakeholder partnership less developed','Comfortable partnering with senior stakeholders on analytical strategy; can hold their own in a room with functional leaders','Partners with Director-level and above on defining analytical questions; shapes what gets measured at the company level','Has served as a thought partner to C-suite and functional leadership on what to measure and how to interpret it; has changed the direction of product or clinical strategy through analytical insight'],
+            ['Has not demonstrated data governance ownership; quality is individual, not team-level','Data quality is a personal discipline but not something they\'ve built infrastructure around for others','Has contributed meaningfully to data quality infrastructure; can take ownership of governance initiatives with support','Owns data quality standards for the team; has built governance infrastructure that other analysts follow','Built and maintained a complete data governance framework — testing strategy, documentation, ownership model, and change management process — from scratch; defines what "good" looks like for the team'],
+            ['No domain experience; analytical excellence doesn\'t compensate for the healthcare and education grounding this role requires','Pure tech or consumer data background; domain translation would require significant time','Adjacent experience with solid domain fluency; can build the healthcare-specific expertise with a foundation already in place','Deep healthcare or education data background; can connect analytical choices to clinical or educational outcomes','Has built outcome measurement frameworks for a healthcare or education company; shapes what gets measured at the company level with domain grounding'],
+            ['Proactive framing capability is at senior analyst level; hasn\'t demonstrated staff-level analytical influence','Stronger as a technical leader than a problem-framing leader; defaults to executing well-defined questions','Strong instinct for reframing; proactively challenges requirements at team level, not just individually','Regularly shapes what questions get asked and how; analytical influence extends beyond their own work','Has fundamentally reshaped how a company thinks about its core metrics; proposed frameworks that revealed problems leadership had missed'],
+            ['Can\'t connect data architecture decisions to patient outcomes','Mission incidental; the principal-level technical work is the primary attraction','Genuine interest; not purely motivated by technical challenge','Authentic alignment; can articulate why data infrastructure in a healthcare setting matters differently','Sees every architectural and measurement decision as having direct clinical implications; brings genuine care about student mental health to data infrastructure choices'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'product',
+    label: 'Product',
+    color: '#2E5E8A',
+    bg: '#F2F6FB',
+    title: 'Product',
+    sub: 'Defines what Cartwheel builds and why — from school-facing workflows to AI-powered care tools',
+    criteria: [
+      { name: '0→1 Product Ownership', def: 'Builds from idea to shipped product in ambiguous problem spaces. Drives complete product lifecycle — not just feature delivery.', wt: '25%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — "0→1 product development in ambiguous problem spaces" is a day-one non-negotiable. Feature-delivery PMs who need a defined roadmap are a mismatch.' },
+      { name: 'Workflow-to-Product Translation', def: 'Translates complex real-world school and clinical workflows into usable software. Reduces friction — doesn\'t just digitize paper.', wt: '22%', tags: ['u3','fn'], labels: ['U3 Communication','Function-specific'], uids: ['u3'], tip: 'Captures U3 Communication Across Audiences — PM\'s expression is translating what a school counselor or clinician actually does into product decisions that non-clinical engineers can build and non-technical users can navigate.' },
+      { name: 'AI Product Judgment', def: 'Builds AI-assisted tools with trust, safety, and usability baked in. Understands when AI helps vs. introduces risk in clinical/educational contexts.', wt: '20%', tags: ['fn'], labels: ['Function-specific only'], uids: [], tip: 'Function-specific only — AI product judgment in a clinical-educational context is a distinct competency. The stakes of a bad AI feature in a school mental health tool are categorically different from consumer or B2B SaaS.' },
+      { name: 'Cross-Functional Product Leadership', def: 'Partners with Design, Engineering, Clinical, and GTM simultaneously. Drives alignment without authority.', wt: '18%', tags: ['u4','fn'], labels: ['U4 Cross-Functional','Function-specific'], uids: ['u4'], tip: 'Captures U4 Cross-Functional Instinct — the PM intake explicitly lists Design, Engineering, Clinical, and Executive Leadership as day-to-day partners. PMs who lead through authority rather than influence will not work at this stage.' },
+      { name: 'Startup Product Ambiguity Fit', def: '"Comfortable with incomplete information." Defines MVP, manages scope, makes consequential product calls without full data.', wt: '10%', tags: ['u5'], labels: ['U5 Ambiguity'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — "strong product judgment with incomplete information" is a listed day-one requirement. Cartwheel is building products in a market that hasn\'t been well served.' },
+      { name: 'Mission Alignment', def: 'Genuine belief in the clinical implications of product decisions — technology as a vehicle for mental health outcomes, not just a SaaS product.', wt: '5%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone — for PMs, mission alignment shapes the quality of tradeoff decisions. A PM who doesn\'t internalize that their product touches kids in crisis will optimize for engagement metrics over safety.' },
+    ],
+    roles: [
+      {
+        title: 'Senior / Principal PM',
+        items: [
+          '0→1 individual contributor scope; direct user research ownership; defining success metrics for early-stage work',
+          'Seniority determined by scope of ambiguity tolerated and breadth of cross-functional partnerships owned',
+          'Drives sprint planning and roadmap communication to leadership without heavy scaffolding',
+          'Comfortable with rapid context-switching across clinical, school, and internal product areas',
+        ],
+        scorecard: {
+          rationale: '0→1 product ownership weighted highest because Cartwheel PM scope requires building products in ambiguous problem spaces without a defined roadmap — all other product competencies serve or qualify that foundational capability.',
+          anchors: [
+            ['Has only managed feature delivery within a defined roadmap; no evidence of problem discovery or 0→1 ownership','Has contributed to 0→1 work as a collaborator but hasn\'t owned a full product lifecycle from discovery to launch','Has shipped a product from scratch with some scaffolding; can own the full lifecycle with light direction from leadership','Has independently built and shipped products from 0→1 in ambiguous problem spaces; owns discovery, definition, and delivery without hand-holding','Has launched multiple 0→1 products that became core to a company\'s revenue or clinical offering; defines the problem space and builds the team\'s discovery practice'],
+            ['Cannot translate real-world school or clinical workflows into product decisions; defaults to user stories that miss operational context','Can describe workflows at a surface level but product decisions don\'t reflect deep workflow understanding; usability gaps emerge in delivery','Has worked with non-technical end users in healthcare or education to define product requirements; can close the translation gap with sustained discovery effort','Routinely translates complex clinical or school workflows into product decisions; engineers can build from their specs without losing domain accuracy','Has fundamentally redesigned how a healthcare or education organization does its work through product — not just digitizing, but improving the underlying workflow'],
+            ['No experience with AI products in any context; or has shipped AI features without considering safety and trust implications','Experience with AI features in low-stakes consumer contexts; hasn\'t confronted the regulatory or clinical complexity of AI in school mental health','Has defined evaluation criteria for AI feature quality in a regulated or high-stakes context; can scope AI features responsibly with support','Has shipped AI-assisted features in a healthcare or education product with explicit attention to trust, safety, and usability for non-technical users','Has built an AI product governance framework for a clinical or educational context; defines what safe and trustworthy AI looks like and operationalizes it across the product team'],
+            ['Requires authority to drive alignment; escalates frequently because cross-functional partners aren\'t moving fast enough','Can coordinate with adjacent teams but doesn\'t proactively build relationships or create alignment before decisions need to be made','Maintains functional working relationships with Design, Engineering, and at least one non-technical partner; alignment is generally achieved even if not elegant','Actively builds alignment with clinical, engineering, design, and GTM partners; creates shared context and resolves cross-functional tension proactively','Has served as the connective tissue across clinical, product, engineering, and GTM at a growth-stage company; stakeholders actively seek them out as the person who creates shared understanding'],
+            ['Needs comprehensive specs and data before making product calls; stalls in ambiguous problem spaces','Can proceed with incomplete information on low-stakes decisions but frequently escalates or delays when stakes are higher','Has made consequential product calls with incomplete data; comfortable defining and defending a minimum viable product even when more research was possible','Thrives in ambiguity; proactively creates structure for the team and makes product calls with confidence, adjusting as evidence comes in','Has defined and executed a product strategy for a company without a clear playbook; built the research and decision-making frameworks the team now relies on'],
+            ['Views product as a technical exercise; cannot articulate how their product decisions affect student mental health outcomes','Understands the mission intellectually but hasn\'t demonstrated that it shapes product tradeoffs in practice','Can articulate why the clinical implications of product decisions matter; mission is a factor in how they evaluate tradeoffs','Proactively considers the clinical and population impact of product decisions; calls out when product optimization metrics diverge from clinical outcomes','Has restructured product metrics or feature prioritization specifically because a technically sound decision conflicted with student or family wellbeing; mission is a living constraint, not a talking point'],
+          ]
+        }
+      },
+      {
+        title: 'Sr PM, AI Products',
+        items: [
+          'Experience building AI-assisted workflows in regulated environments — not just LLM wrappers',
+          'Safety and trust are first-class product concerns; defines evaluation frameworks for AI feature quality',
+          'Translates AI product concepts for clinical and school stakeholders without technical jargon',
+          'Understands LLM capabilities, limitations, and responsible deployment in high-stakes contexts',
+        ],
+        scorecard: {
+          rationale: '0→1 product ownership weighted highest because the AI PM role requires building novel products in an area where most companies are still learning — AI product judgment is the distinctive qualifier, not the primary screen; it determines fit between candidates who both can own 0→1.',
+          anchors: [
+            ['Has only shipped AI features as incremental additions to existing products; no 0→1 ownership of an AI-first product','Has contributed to 0→1 AI product work as a collaborator but hasn\'t driven the full lifecycle independently','Has shipped an AI-assisted product from 0→1 in a structured environment; can own the lifecycle with support on safety and evaluation frameworks','Has independently built and launched an AI-first product; defined the problem space, evaluation criteria, and delivery without a template','Has launched multiple AI products that became core to a company\'s clinical or operational capability; builds the frameworks that junior PMs on the team follow for AI product development'],
+            ['Builds AI products designed by engineers for engineers; cannot translate how school counselors or clinicians actually work into AI feature design','Understands clinical or school workflows at a surface level; AI features miss friction points in actual care delivery','Has translated a clinical or school workflow into an AI-assisted product requirement; end users can navigate the product with limited training','Routinely bridges AI capability and real-world workflow; AI features reduce friction in actual clinical or school care delivery workflows','Has redesigned a healthcare or education workflow by identifying exactly where AI removes a bottleneck that humans couldn\'t solve alone; the product changes how practitioners work, not just what they click'],
+            ['Has shipped AI features without evaluation frameworks, user testing in high-stakes contexts, or safety review; AI is treated as any other feature','Understands AI safety conceptually but hasn\'t operationalized it in a healthcare or regulated context; evaluation criteria are vague','Has defined evaluation frameworks for AI feature quality in a regulated context; knows when AI is and isn\'t appropriate for a given use case','Has built and shipped AI features in healthcare or education with explicit evaluation criteria, trust design, and rollout safeguards; clinical and school stakeholders trust the product','Has built a comprehensive AI product governance framework for a clinical or educational context — evaluation rubrics, responsible AI guidelines, failure mode analysis, and stakeholder communication — that other teams adopted'],
+            ['Drives AI product direction without surfacing clinical or safety concerns from non-technical partners; cross-functional tension unresolved','Coordinates with adjacent teams but clinical stakeholders feel their concerns aren\'t heard in AI product decisions','Maintains working relationships across Engineering, Clinical, and Design; clinical concerns reliably surface and get addressed before launch','Actively creates forums for clinical and school stakeholders to stress-test AI features; uses their feedback to define quality gates before launch','Has built an AI product partnership model between clinical, engineering, and product that every AI launch has clinical sign-off embedded in as a non-negotiable process step'],
+            ['Cannot scope AI products responsibly without complete research; scoping ambiguity in AI features produces over-engineered or under-specified launches','Can make AI product decisions in low-stakes areas but over-engineers or stalls when safety implications are unclear','Has shipped AI products in fast-moving environments with incomplete data; knows when to proceed with guardrails vs. wait for more research','Thrives in the ambiguity native to early AI products; builds evaluation frameworks before the full product picture is clear','Has built an AI product strategy at a company without precedent for how to do it responsibly in their vertical; their framework is now the company standard'],
+            ['Views AI product work as a technical challenge; cannot connect AI features to student mental health outcomes','Understands the mission intellectually but AI product decisions aren\'t shaped by clinical or population impact considerations','Considers clinical implications of AI features in tradeoffs; can articulate why safety in a school mental health context is different from consumer AI','Proactively designs AI features with youth mental health outcomes as a primary constraint; calls out when AI optimization metrics diverge from clinical safety','Has restructured AI product direction specifically because an optimal AI feature conflicted with youth wellbeing; brings genuine care about the population to every AI product decision'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'people',
+    label: 'People & Culture',
+    color: '#8A4D6E',
+    bg: '#FDF4F9',
+    title: 'People & Culture',
+    sub: 'Builds the talent, systems, and team experience that enable Cartwheel to grow with the right people in the right roles',
+    criteria: [
+      { name: 'Employee & Candidate Experience Design', def: 'Builds people touchpoints — recruiting process, onboarding, performance frameworks, offboarding — that are equitable, efficient, and distinctively Cartwheel. Not just process administration.', wt: '22%', tags: ['u3','u4','fn'], labels: ['U3 Communication','U4 Cross-Functional','Function-specific'], uids: ['u3','u4'], tip: 'Captures U3 + U4 — P&C team members serve every department simultaneously and shape how people experience working at Cartwheel. The failure mode is process-only thinking that prioritizes compliance over people.' },
+      { name: 'People Systems & Infrastructure', def: 'Builds and maintains HRIS, ATS, compensation bands, performance review infrastructure, and people analytics. Creates the operating system for the people function from scratch.', wt: '22%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — P&C at a Series B company means designing the systems, not inheriting them. Candidates who need established HR infrastructure to be effective will consistently hit constraints as Cartwheel scales.' },
+      { name: 'Stakeholder Partnership & Influence', def: 'Partners with every department head as a trusted advisor. Drives people decisions — headcount planning, performance calibration, comp leveling — with and through leadership rather than for them.', wt: '20%', tags: ['u4'], labels: ['U4 Cross-Functional'], uids: ['u4'], tip: 'Captures U4 Cross-Functional Instinct — P&C\'s operating model is as an internal service partner. HR team members who operate transactionally rather than as strategic partners are a mismatch for Cartwheel\'s stage.' },
+      { name: 'Mission Alignment', def: 'Deep personal connection to the mission — P&C team members shape who works at Cartwheel and how they experience it. That judgment requires caring about the outcome, not just the process.', wt: '15%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone with high weight — the P&C team shapes Cartwheel\'s culture and talent decisions. Mission misalignment here has second-order effects on every team they support.' },
+      { name: 'HR Compliance & Data Integrity', def: 'Maintains employment law compliance, benefits administration, HRIS data quality, and audit-readiness. Non-negotiable floor — not the ceiling.', wt: '13%', tags: ['fn'], labels: ['Function-specific only'], uids: [], tip: 'Function-specific only — compliance and data integrity are table stakes for any HR function. At Cartwheel\'s stage, the risk of compliance failures is high and must be owned by P&C, not outsourced to legal or finance.' },
+      { name: 'Startup People Ops Adaptability', def: 'Thrives with ambiguous policies, evolving org structures, and incomplete precedent. Builds people programs with a lean team and limited resources.', wt: '8%', tags: ['u5'], labels: ['U5 Ambiguity'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — P&C at a Series B means creating policy where none exists, adapting quickly when org structures shift, and executing without the support infrastructure of a mature HR function.' },
+    ],
+    roles: [
+      {
+        title: 'Talent Acquisition / Recruiter',
+        items: [
+          'Full-cycle recruiting ownership: sourcing through offer for corporate and clinical roles across multiple reqs simultaneously',
+          'Healthcare/EdTech recruiting experience strongly preferred — understanding of the candidate market and compensation dynamics',
+          'Sourcing sophistication: goes beyond job boards; builds pipelines through Boolean search, events, employee referrals, and direct outreach',
+          'Hiring manager partnership: advises on calibration, interview process design, and offer strategy — not just a scheduler',
+        ],
+        scorecard: {
+          rationale: 'Candidate experience design and people systems infrastructure weighted equally at 22% because a Cartwheel recruiter simultaneously owns candidate experience quality AND the operational infrastructure that makes it repeatable — neither works without the other at a scaling startup.',
+          anchors: [
+            ['Views recruiting as a transaction; candidates receive no communication updates, screening questions are generic, and the interview experience is not managed','Tracks candidate stages and sends timely updates but doesn\'t design the experience — it just happens','Has actively designed a candidate experience for at least one function; hiring managers receive a consistent process and candidates get structured feedback','Owns the full candidate experience end-to-end; interview processes are equitable, consistent, and distinctively Cartwheel; candidates frequently comment positively on the experience','Has built a candidate experience program from scratch that became a competitive differentiator; candidates in the finalist stage can articulate why Cartwheel\'s process stood out from other companies they were in process with'],
+            ['Uses ATS as a scheduling tool; no pipeline hygiene, no sourcing infrastructure, no data discipline','Keeps the ATS reasonably current but hasn\'t built sourcing infrastructure or meaningful pipeline reporting','Maintains clean ATS data; has built basic sourcing workflows and can report on pipeline health by stage and role','Has configured and optimized an ATS for a growth-stage recruiting team; built sourcing sequences, pipeline reports, and automation that improve recruiter efficiency','Has built the full recruiting infrastructure stack — ATS configuration, sourcing workflows, req tracking, reporting dashboards, and outreach automation — from scratch for a scaling company; the infrastructure survives their departure'],
+            ['Acts as a scheduler and slate provider; hiring managers make all calibration and offer decisions independently','Provides candidates and logistics but doesn\'t proactively advise on calibration, process design, or offer strategy','Regularly advises hiring managers on calibration and interview design; pushes back when job requirements are unrealistic; most hiring managers trust the partnership','Serves as a true recruiting partner; shapes interview process design, calibration standards, and offer strategy with hiring managers; hiring managers seek their input before making decisions','Has completely changed how a hiring manager approaches recruiting — including sourcing assumptions, compensation expectations, and decision-making criteria — through consistent trusted partnership'],
+            ['Cannot articulate why recruiting for a pediatric behavioral health company is different from recruiting for any other tech company','Understands the mission but doesn\'t connect it to how they source, pitch, or screen candidates','Screens candidates for mission alignment as part of the process; can articulate Cartwheel\'s purpose to candidates in a way that is specific and compelling','Mission conviction is visible in how they source, screen, and pitch; candidates frequently comment that the recruiter\'s genuine belief influenced their decision to engage','Has built a recruiting brand and talent pipeline specifically around mission-aligned candidates for a pediatric or youth mental health organization; the sourcing strategy reflects deep personal belief, not a talking point'],
+            ['Not current on EEOC requirements, I-9 documentation, or ATS data hygiene; compliance failures require remediation','Knows compliance requirements but doesn\'t actively build compliance into the recruiting process; relies on HR to catch errors','Maintains EEOC compliance and ATS accuracy consistently; knows when to escalate a compliance question vs. handle it independently','Proactively builds compliance into every recruiting workflow; documentation is audit-ready and HRIS data is reliable without requiring cleanup','Has designed a compliant, auditable recruiting operation from scratch — EEOC tracking, interview guide standardization, and ATS documentation protocols — that survived an external audit without remediation'],
+            ['Requires a defined req load, stable job descriptions, and consistent processes to perform; breaks down when priorities shift rapidly','Can manage moderate ambiguity but noticeably less effective when reqs change, timelines compress, or process hasn\'t been built yet','Has managed multiple reqs simultaneously in a fast-moving environment; adjusts sourcing strategy and timelines without losing overall pipeline health','Thrives with high req volume, shifting priorities, and under-defined roles; creates clarity and executes with consistency even when the environment is disorganized','Has built and run a full-cycle recruiting operation at a scaling startup during rapid headcount growth — managing 15+ reqs simultaneously, building the process while working in it, and hitting hiring targets'],
+          ]
+        }
+      },
+      {
+        title: 'HR Business Partner / PeopleOps',
+        items: [
+          'Employee relations depth: handles performance, conflict, exits, and investigations with judgment and care',
+          'Compensation fluency: benchmarks roles, maintains bands, and partners with Finance on leveling decisions',
+          'HRIS ownership: keeps people data clean, configures workflows, and generates people analytics for leadership',
+          'Benefits and onboarding program administration with a high-touch employee experience orientation',
+        ],
+        scorecard: {
+          rationale: 'Employee lifecycle design and people systems infrastructure weighted equally at 22% because an effective HRBP both designs the employee experience AND builds the systems that make it consistent — the combination is what enables P&C to operate as a strategic function rather than a transactional one.',
+          anchors: [
+            ['Administers HR processes transactionally; onboarding is paperwork, performance is a calendar event, and offboarding is a checklist','Executes HR processes consistently but hasn\'t designed them; the experience is functional but not distinctive','Has improved at least one employee lifecycle touchpoint — onboarding program, performance framework, or offboarding process — with visible impact on employee experience','Has designed multiple employee lifecycle programs that are equitable, efficient, and distinctively Cartwheel; employees notice and comment on the quality of the experience','Has built an employee experience program from scratch — onboarding, 30/60/90 frameworks, performance calibration, and offboarding protocols — that became a cultural asset; the program drives measurable engagement and retention'],
+            ['Uses HRIS as a storage system; data is dirty, reports are manual, and comp bands don\'t exist or are outdated','Maintains reasonable HRIS hygiene but hasn\'t built infrastructure around it; reporting requires manual export and manipulation','Keeps HRIS data clean and can generate standard people analytics reports; has worked with comp band structures and can apply them with guidance','Has configured and maintained an HRIS for a growth-stage company; built comp band infrastructure, automated workflows, and people analytics dashboards that leadership uses','Has built the complete people infrastructure stack — HRIS configuration, comp philosophy and band architecture, benefits administration framework, and people analytics — from scratch at a scaling company'],
+            ['Reactive and transactional; department leaders come to HR to complete paperwork, not for guidance','Available to answer questions but doesn\'t proactively advise; department leaders don\'t think of HR as a strategic resource','Regularly advises hiring managers and department leaders on employee relations, performance management, and headcount planning; pushes back when appropriate','Serves as a trusted advisor to multiple department leaders; they proactively seek HR input before making people decisions, not just after problems arise','Has fundamentally changed how a leadership team makes people decisions — from reactive to proactive, from intuition to evidence — through consistent trusted partnership; department leaders cite the HRBP as a key reason for team performance'],
+            ['Views HR as a functional role without connection to Cartwheel\'s clinical mission; cannot articulate how people programs enable mental health outcomes','Understands the mission but doesn\'t connect it to how they design people programs or advise leaders','Integrates mission into people programs; can articulate why Cartwheel\'s HR function has different stakes than a typical Series B tech company','Mission conviction shapes how they approach hiring, culture design, and people decisions; visible in the questions they ask and the programs they build','Has built a people function specifically oriented around retaining mission-aligned talent for a clinical or social-impact organization; the people programs are designed around the specific motivations of the workforce, not a generic HR template'],
+            ['Not current on state employment law, benefits administration requirements, or HRIS data standards; compliance gaps require legal remediation','Knows compliance requirements conceptually but doesn\'t proactively build compliance into people systems or workflows','Maintains employment law compliance and HRIS data integrity; knows when to escalate a compliance question and keeps the company audit-ready for standard HR audits','Proactively builds compliance into all people systems and workflows; benefits administration is accurate, state law requirements are tracked, and the company is consistently audit-ready','Has designed and maintained a fully compliant people operations infrastructure for a multi-state healthcare company — benefits administration, state employment law tracking, and HRIS audit protocols — that passed external audit without remediation'],
+            ['Needs established policy, defined process, and sufficient HR bandwidth to perform; breaks down when org structure is changing or policy doesn\'t exist','Can operate with some ambiguity but noticeably less effective when the org is in flux or policy requires creation rather than application','Has built or adapted at least two people programs in a fast-moving environment where the policy didn\'t fully exist; comfortable with iterative implementation','Thrives with incomplete policy and changing org structure; creates people infrastructure while simultaneously executing against current needs','Has built an entire HR function from scratch at a scaling startup — policy manual, HRIS, comp philosophy, performance management, and onboarding — while simultaneously supporting rapid headcount growth with a two-person team'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'ops',
+    label: 'Operations',
+    color: '#7B3080',
+    bg: '#F8F2FC',
+    title: 'Operations',
+    sub: 'Scales Cartwheel\'s care delivery, business processes, and health plan infrastructure across Care Ops, BizOps, Health Plan Ops, and RCM',
+    criteria: [
+      { name: 'Mission Alignment & Population Commitment', def: 'Deep, durable commitment to serving underserved youth — Medicaid-eligible, foster care, English learners. The most explicit mission screen in the company.', wt: '25%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 Mission Conviction at highest weight across all departments — Operations roles touch care delivery directly. Candidates who treat clinical operations as pure ops — without connecting to the student and family on the other end — are a values mismatch.' },
+      { name: 'Process Design & Operational Infrastructure', def: 'Builds SOPs, optimizes workflows, implements automation, and scales operational capacity. Does not maintain the status quo — systematically improves it.', wt: '22%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — across CareOps, BizOps, Health Plan Ops, and RCM, the shared expression is creating durable operational frameworks where none existed. Candidates who only execute existing processes are not a fit.' },
+      { name: 'Cross-Functional Operations Translation', def: 'Translates between clinical requirements, finance constraints, product systems, and GTM realities. Bridges technical and non-technical ops stakeholders without information loss.', wt: '20%', tags: ['u3','u4'], labels: ['U3 Communication','U4 Cross-Functional'], uids: ['u3','u4'], tip: 'Captures U3 + U4 — Operations at Cartwheel is the connective tissue between clinical delivery, payer relationships, and internal business systems. Siloed execution without cross-team translation is the failure mode across all Ops sub-functions.' },
+      { name: 'Healthcare Operations Domain Fluency', def: 'Understands Medicaid economics, payer dynamics, referral workflows, prior authorization, billing cycles, and care delivery models in school-based or community settings.', wt: '18%', tags: ['fn'], labels: ['Function-specific only'], uids: [], tip: 'Function-specific only — healthcare operations domain knowledge is non-trivial and cannot be trained quickly. The specific expression varies by sub-function (RCM: billing and coding; Health Plan: payer contracting and auth; CareOps: referral-to-start workflow; BizOps: reporting and process infrastructure).' },
+      { name: 'Startup Pace & Operational Adaptability', def: 'Maintains operational standards while iterating rapidly. Does not need fully-built systems to perform — creates stability while scaling.', wt: '15%', tags: ['u5','fn'], labels: ['U5 Ambiguity','Function-specific'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — Operations at a Series B means building compliance frameworks and process infrastructure simultaneously with high-volume care delivery. Candidates who need institutional stability before executing consistently will be too slow.' },
+    ],
+    roles: [
+      {
+        title: 'Care Coordination Manager',
+        items: [
+          'Operations background over clinical: BI tools, SLA management, frontline team management at scale',
+          'Owns referral-to-start workflow, intake triage, and care pathway operations across active states',
+          'Tracks outcomes, escalation patterns, and scheduling/consent/family communication playbooks',
+          'Clinical depth can be trained; ops discipline and process execution cannot',
+        ],
+        scorecard: {
+          rationale: 'Mission alignment and population commitment weighted highest because care coordination decisions — escalation prioritization, family communication — are different in kind when the population is underserved Medicaid youth; operational discipline without mission grounding optimizes for efficiency over access.',
+          anchors: [
+            ['Views care coordination as a scheduling and logistics problem; cannot connect their work to the student and family experience','Understands the mission conceptually but operational decisions don\'t reflect prioritization of the underserved population','Can articulate why care coordination in a Medicaid/school-based context requires different standards; mission shapes how they escalate and prioritize','Genuine commitment to the population is visible in how they manage the team and make operational tradeoffs; teams report that the manager communicates purpose, not just metrics','Has built a care coordination operation specifically designed around the barriers facing underserved youth — family language access, consent complexity, school scheduling constraints — because they care, not because it was in a playbook'],
+            ['Manages the existing care coordination workflow reactively; escalations go unresolved, SLAs aren\'t tracked, and process documentation doesn\'t exist','Maintains the existing workflow with reasonable consistency but hasn\'t systematically improved it; process improvements happen ad hoc','Has documented and improved at least one care coordination process — referral intake, scheduling, or consent workflows — with measurable reduction in lag or error rate','Has redesigned a care coordination workflow end-to-end; SLAs are tracked, escalation playbooks exist, and the team executes against defined standards','Has built a complete care coordination operating system from scratch — referral intake, triage, scheduling, consent, family communication, and escalation protocols — for a school-based or Medicaid-funded care delivery organization'],
+            ['Operates within the care coordination function without connecting to clinical quality, product systems, or GTM; issues requiring cross-functional input go unresolved','Escalates cross-functional issues but doesn\'t drive them to resolution; other teams receive care coordination requests without context','Regularly coordinates with clinical leads, product teams, and school partners; cross-functional issues generally get resolved even if the process isn\'t smooth','Serves as the operational bridge between care delivery, clinical standards, product systems, and school-facing teams; cross-functional issues surface and resolve at the right level','Has built cross-functional operating protocols between care coordination, clinical quality, product, and school success teams that reduced handoff failures and improved time-to-care'],
+            ['No experience with behavioral health or school-based care delivery operations; would require significant onboarding to understand referral and consent requirements','General healthcare operations background without school-based or pediatric behavioral health specificity; referral and consent workflows are unfamiliar','Has managed care coordination or scheduling operations in a behavioral health or school-based context; understands the referral-to-start workflow and its constraints','Deep experience with school-based or community behavioral health care coordination; knows the regulatory, consent, and scheduling constraints from practice, not study','Has scaled a school-based or Medicaid behavioral health care coordination operation from a small pilot to a multi-state program; authored the playbooks the field uses'],
+            ['Requires operational stability to manage the team effectively; performance degrades noticeably when systems are changing or volume is growing rapidly','Can maintain operations under moderate growth but needs lead time to adapt; rapid scaling or system changes produce quality issues','Has managed a care coordination team through a period of significant volume growth; maintained acceptable SLAs while building new processes in parallel','Thrives in a scaling environment; maintains care coordination quality standards while actively redesigning workflows to accommodate growth','Has scaled a care coordination team from single-state to multi-state operations while simultaneously building the infrastructure; SLAs held throughout and the team grew without proportional error-rate increase'],
+          ]
+        }
+      },
+      {
+        title: 'Clinical Manager',
+        items: [
+          'Independent licensure required: LCSW, LICSW, LMHC, LCPC, PhD/PsyD — hard gate, not a preference',
+          '5+ years managing licensed clinicians in pediatric behavioral health',
+          'Clinical supervision capability; manages documentation quality and clinical standards',
+          'Interfaces with school clinical leads and district mental health coordinators',
+        ],
+        scorecard: {
+          rationale: 'Mission alignment weighted highest because the Clinical Manager shapes the clinical culture of the school-based team — their supervision philosophy and population commitment directly determines how licensed clinicians engage with underserved youth over years of employment.',
+          anchors: [
+            ['Views clinical management as a supervision and compliance function; cannot articulate why the Medicaid, school-based population requires a different clinical management approach','Has worked with underserved populations but clinical management approach isn\'t specifically adapted to the barriers this population faces','Has managed licensed clinicians in a school-based or underserved youth context; supervision approach accounts for the specific presenting issues of Medicaid-eligible youth','Deep personal and professional commitment to the Medicaid school-based population; supervision choices reflect genuine care for this specific population and the clinicians serving them','Has built a clinical management model specifically designed for school-based behavioral health delivery with under-resourced youth — supervision cadence, documentation standards, crisis protocols — because the population requires it'],
+            ['Clinical supervision is ad hoc; documentation standards are inconsistently applied and there is no QA framework','Provides supervision and ensures documentation compliance but hasn\'t built systematic quality infrastructure','Has built or maintained clinical documentation standards and supervision protocols for a behavioral health team; quality is consistent even if infrastructure is basic','Has designed a clinical quality framework — documentation standards, supervision cadence, outcome tracking, and peer review — for a behavioral health team with demonstrable quality outcomes','Has built a complete clinical quality infrastructure — credentialing standards, supervision frameworks, outcome measurement, documentation protocols, and QA processes — for a school-based behavioral health program from the ground up'],
+            ['Operates exclusively within the clinical function; doesn\'t engage with school partners, operations, or product unless escalated','Responds to cross-functional requests but doesn\'t proactively build relationships with school mental health coordinators, care coordination, or product','Maintains working relationships with school clinical leads, care coordination, and at least one operational partner; clinical perspective is represented in cross-functional decisions','Serves as the clinical voice in cross-functional conversations with school partners, operations, and product; clinical requirements translate into actionable operational guidance','Has built clinical partnership protocols with school district mental health coordinators, care coordination teams, and product managers that improved both clinical quality and operational efficiency'],
+            ['Does not hold independent licensure; ineligible for this role','Holds independent licensure but clinical supervision experience is limited to peer consultation rather than formal management of licensed clinicians','Holds independent licensure with 3–5 years managing licensed clinicians in behavioral health; familiar with supervision requirements across LCSW, LMHC, and LCPC credential types','5+ years of independent licensure and clinical management in pediatric behavioral health; has managed multi-disciplinary behavioral health teams in school-based or community settings','Has built and scaled a clinical team of 20+ licensed behavioral health clinicians in a school-based or pediatric community context; authored supervision frameworks and credentialing standards the organization adopted'],
+            ['Clinical management approach requires institutional stability; expanding to new states or changing clinical workflows produces quality degradation','Can maintain clinical quality under moderate operational change but needs significant lead time for new state or model expansions','Has maintained clinical supervision quality while the organization scaled into new states or significantly changed its care model; quality metrics held','Manages clinical quality proactively while the organization scales; builds supervision infrastructure in new states before quality issues emerge','Has built and maintained clinical quality across a multi-state school-based behavioral health program during rapid expansion; defined how quality standards translate into new regulatory environments'],
+          ]
+        }
+      },
+      {
+        title: 'Health Plan Operations',
+        items: [
+          'Payer contracting and credentialing experience: managed Medicaid and CHIP preferred',
+          'Prior authorization management: builds workflows to minimize auth delays and denials at scale',
+          'Provider roster and network management; ensures compliance with payer participation requirements',
+          'Cross-functional bridge between clinical delivery, RCM, and payer relationship management',
+        ],
+        scorecard: {
+          rationale: 'Mission alignment weighted highest because payer network decisions — network participation, prior auth aggressiveness, credentialing standards — directly determine whether Medicaid-eligible youth can access care; Health Plan Ops without mission grounding optimizes for administrative efficiency over patient access.',
+          anchors: [
+            ['Views health plan operations as a payer relations and billing function without connection to the Medicaid youth population being served','Understands the mission but doesn\'t connect health plan operations decisions to patient access and care delivery for underserved youth','Can articulate why Medicaid and CHIP payer relationships are mission-critical — patient access depends directly on network participation and prior auth approval rates','Health plan operations decisions are made through the lens of patient access; proactively flags payer decisions that will create barriers for Medicaid-eligible youth','Has built payer relationship and prior authorization management systems specifically designed to maximize access for Medicaid-eligible youth in under-resourced school settings — not just optimal revenue, but optimal access'],
+            ['No systematic prior auth or credentialing workflows; authorization delays and roster errors require manual remediation','Manages prior auth and credentialing reactively; processes exist but aren\'t documented or systematically optimized','Has built or significantly improved prior authorization and credentialing workflows for a behavioral health organization; error rates and turnaround times are tracked and managed','Has designed complete prior authorization management and credentialing infrastructure; denial rates are low, turnaround is fast, and the team executes against defined SLAs','Has built a health plan operations infrastructure — prior auth workflows, credentialing systems, network management, and payer compliance protocols — from scratch for a multi-state behavioral health organization'],
+            ['Manages payer relationships in isolation; clinical delivery teams and RCM don\'t receive timely information about authorization requirements or contract terms','Responds to cross-functional requests but doesn\'t proactively share payer intelligence with clinical or RCM teams','Regularly communicates authorization requirements and contract terms to clinical and RCM teams; cross-functional handoffs are generally clean','Serves as the bridge between payer relationships, clinical delivery requirements, and RCM; proactively shares payer intelligence that shapes clinical and billing operations','Has built a payer intelligence and communication system that keeps clinical, RCM, and leadership continuously informed about network participation, authorization trends, and contract performance'],
+            ['General healthcare operations background without Medicaid or payer contracting experience; would require extensive onboarding for this role','Commercial health plan operations experience without Medicaid or CHIP specificity; Medicaid contracting and credentialing requirements are unfamiliar','Has managed prior authorization and credentialing for a behavioral health or specialty care organization; familiar with Medicaid billing requirements and basic payer contracting','Deep experience with managed Medicaid and CHIP contracting, credentialing, and prior authorization management; has navigated multi-state payer relationships for a behavioral health provider','Has built and managed health plan operations for a multi-state Medicaid behavioral health organization — payer contracting, credentialing, prior auth system, and network compliance — from scratch; defines what good looks like for the function'],
+            ['Requires stable payer relationships and defined processes; performance degrades when contracting is in flux or new state expansion changes network requirements','Can manage moderate complexity but needs lead time when entering new states or renegotiating payer contracts','Has managed health plan operations during state expansion or significant payer contract renegotiation; maintained network integrity and prior auth performance through the transition','Thrives in a rapidly expanding payer environment; builds health plan operations infrastructure in new states before patient enrollment begins','Has scaled health plan operations from 2 states to 10+ while maintaining credentialing compliance and prior authorization performance; built the multi-state payer management infrastructure the organization now runs on'],
+          ]
+        }
+      },
+      {
+        title: 'Revenue Cycle Management (RCM)',
+        items: [
+          'Billing and coding expertise in behavioral health: CPT codes, Medicaid billing, EPSDT',
+          'Denial management: builds workflows to identify, appeal, and resolve claim rejections systematically',
+          'Cash flow and A/R reporting: communicates RCM performance to Finance with precision',
+          'HIPAA compliance and audit-readiness: maintains billing infrastructure to regulatory standard',
+        ],
+        scorecard: {
+          rationale: 'Mission alignment weighted highest because Medicaid billing decisions — claim submission standards, denial management aggressiveness, A/R write-off thresholds — directly affect Cartwheel\'s ability to sustain service in low-income school districts; RCM without mission grounding optimizes for margin over access sustainability.',
+          anchors: [
+            ['Views RCM as a pure financial function; cannot articulate how billing accuracy and denial management affect patient access for Medicaid-eligible youth','Understands the mission but RCM decisions are made purely on financial optimization without consideration of access implications','Can articulate why Medicaid RCM accuracy is mission-critical — underpayments and denials directly affect Cartwheel\'s ability to sustain service in low-income school districts','Treats RCM as a mission-enabling function; proactively flags billing patterns that indicate access barriers or payer compliance issues affecting the Medicaid population','Has designed a Medicaid behavioral health billing and RCM function specifically to maximize sustainable access for underserved youth — optimizing for mission viability, not just margin'],
+            ['Claims are submitted and errors handled reactively; no denial management workflow, A/R reporting is manual, and error rates are not tracked systematically','Basic billing workflows exist but denial management is reactive and A/R reporting requires manual effort','Has built or maintained denial management workflows and basic A/R reporting for a behavioral health billing function; denial rates and collection metrics are tracked','Has designed complete RCM infrastructure — clean claims submission, systematic denial management, A/R aging workflows, and leadership-ready cash flow reporting — for a behavioral health organization','Has built a behavioral health RCM operation from scratch — billing infrastructure, denial management playbooks, A/R reporting, audit protocols, and HIPAA compliance framework — that serves as the model for multi-state expansion'],
+            ['RCM operates as a siloed billing function; Finance doesn\'t receive timely cash flow intelligence and clinical teams don\'t understand billing requirements','Produces required financial reports but doesn\'t proactively translate RCM performance into operational implications for clinical or Finance leadership','Regularly communicates RCM performance to Finance and flags clinical documentation issues that affect claim quality; cross-functional handoffs are generally clean','Serves as the bridge between billing operations, clinical documentation standards, and Finance; proactively identifies and resolves the upstream causes of claim denials with clinical and product teams','Has built a cross-functional RCM intelligence system that keeps Finance, clinical leadership, and operations informed about cash flow performance, denial trends, and billing compliance in real time'],
+            ['No behavioral health billing experience; CPT codes, Medicaid billing requirements, and EPSDT are unfamiliar','General medical billing experience without behavioral health or Medicaid specificity; behavioral health CPT codes and EPSDT requirements are unfamiliar','Has managed behavioral health billing and Medicaid claims; familiar with CPT codes for therapy services, EPSDT billing, and basic denial management','Deep experience with Medicaid behavioral health billing — CPT codes, EPSDT, prior authorization documentation, and denial management; has navigated multi-payer billing environments for a behavioral health provider','Has built and managed a behavioral health Medicaid RCM operation from scratch — billing workflows, CPT code governance, EPSDT documentation standards, and denial management protocols — with clean claim rates above industry benchmark'],
+            ['Requires stable billing infrastructure and payer contracts; performance degrades when billing codes change, new states are added, or systems are being built','Can maintain billing quality under moderate change but needs lead time when adding new states, payers, or service lines','Has managed behavioral health RCM during state expansion or service line addition; maintained billing quality and A/R performance through the transition','Thrives in a scaling RCM environment; builds billing infrastructure for new states and payers before patient volume creates pressure','Has scaled behavioral health Medicaid RCM from 2 states to 10+ while maintaining clean claim rates and A/R performance; built the multi-state billing infrastructure the organization now runs on'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'govrel',
+    label: 'Government Relations',
+    color: '#5C6B2E',
+    bg: '#F5F7F0',
+    title: 'Government Relations',
+    sub: 'Shapes the policy environment that enables Cartwheel to operate and scale in public school systems',
+    criteria: [
+      { name: 'Policy Operations & Intelligence Infrastructure', def: 'Builds and maintains opportunity trackers, event calendars, lobbyist performance frameworks, and collateral libraries across 10+ states.', wt: '25%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — the GR team\'s current failure state is scattered intelligence and missing infrastructure. This function exists to build the "central nervous system" that doesn\'t yet exist.' },
+      { name: 'Legislative Communication & Collateral Production', def: 'Produces monthly impact briefs, talking points, and policy collateral that advances state relationships and supports contract conversion.', wt: '22%', tags: ['u3','fn'], labels: ['U3 Communication','Function-specific'], uids: ['u3'], tip: 'Captures U3 Communication Across Audiences — the GR expression is producing materials that help legislators and agency staff understand Cartwheel\'s impact on student mental health in their districts.' },
+      { name: 'Cross-Team & Lobbyist Coordination', def: 'Primary liaison between GR, Marketing, Data, and Thought Leadership. Manages lobbyist accountability and deliverables without direct authority.', wt: '20%', tags: ['u4','fn'], labels: ['U4 Cross-Functional','Function-specific'], uids: ['u4'], tip: 'Captures U4 Cross-Functional Instinct — GR sits at the intersection of field GR execs, internal Marketing/Data teams, and external lobbyists. Accountability without authority is the operating mode.' },
+      { name: 'Public Sector & State Policy Fluency', def: 'Understands legislative cycles, multi-state contract environments, public sector procurement, and the pace of government decision-making.', wt: '18%', tags: ['fn'], labels: ['Function-specific only'], uids: [], tip: 'Function-specific only — government affairs operates on a fundamentally different timeline and with different stakeholder dynamics than commercial GTM. Candidates without public sector exposure consistently underestimate the patience and relationship-building required.' },
+      { name: 'Startup Pace in a Long-Cycle Environment', def: 'Executes at startup speed on the operational side while holding patience for the political timeline. Does not confuse activity with progress.', wt: '10%', tags: ['u5'], labels: ['U5 Ambiguity'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — GR at a Series B requires startup urgency alongside the long-horizon patience government work demands. Most candidates are strong at one, not both.' },
+      { name: 'Mission Alignment', def: 'Genuine advocacy for student mental health outcomes — the foundation of credibility with legislators, not just policy expertise.', wt: '5%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone — for GR, mission conviction IS the credibility source. Legislators and agency staff can distinguish authentic advocates from hired guns. Mission alignment is both a culture screen and a performance variable.' },
+    ],
+    roles: [
+      {
+        title: 'GR Operations Manager',
+        items: [
+          'Operational scope: brief production, tracker maintenance, lobbyist coordination',
+          'Execution discipline and follow-through are the primary differentiators — political relationships not required at this level',
+          'Manages legislative calendar across 10+ active states; coordinates field GR exec schedules and deliverables',
+          'Learns state-specific context on the job; pre-existing relationships in active states a nice-to-have only',
+        ],
+        scorecard: {
+          rationale: 'Policy operations infrastructure weighted highest because the primary reason the GR Ops Manager role exists is to build and maintain the centralized intelligence system that enables field GR execs to perform — scattered intelligence and missing infrastructure are the current failure state this role is hired to solve.',
+          anchors: [
+            ['No system exists for tracking legislative opportunities, lobbyist deliverables, or policy calendar across states; GR intelligence is scattered and unreliable','Maintains informal trackers but they\'re inconsistently updated and don\'t serve as a reliable single source of truth for the GR team','Has built and maintains a legislative tracking system, lobbyist deliverable calendar, and state opportunity database that the GR team relies on for day-to-day decisions','Owns a comprehensive GR intelligence infrastructure — opportunity trackers, legislative calendars, lobbyist performance frameworks, and collateral libraries — that supports GR execs and informs leadership decisions','Has built a complete GR operations intelligence system from scratch — tracking, reporting, accountability frameworks, and self-service access for field GR execs — that became the operating system for the entire GR function'],
+            ['Produces collateral that is generic, delayed, or doesn\'t reflect state-specific legislative context; GR execs can\'t use it as-is','Produces required materials on time but collateral is templated and doesn\'t capture the specificity needed for legislative conversations','Produces accurate, state-specific impact briefs and talking points on schedule; GR execs can use the materials directly without significant editing','Produces legislative collateral that is tailored, compelling, and on-brand; GR execs regularly cite the materials as instrumental in legislative relationship conversations','Has designed a legislative communication system — brief templates, impact frameworks, talking point libraries, and update protocols — that non-GR team members can use to produce compelling legislative materials independently'],
+            ['Does not proactively coordinate cross-team deliverables; lobbyists miss deadlines, data deliverables are late, and Marketing isn\'t looped in until after decisions are made','Responds to coordination requests but doesn\'t proactively manage lobbyist accountability or cross-team alignment','Maintains lobbyist accountability tracking and coordinates regularly with Marketing and Data; most deliverables arrive on time and cross-team alignment is generally achieved','Proactively manages lobbyist performance and cross-team coordination without direct authority; owns the system that ensures accountability across all GR partners','Has built a multi-stakeholder coordination system — lobbyist accountability framework, cross-team communication protocols, and deliverable tracking — that operates reliably without the GR Ops Manager needing to chase individual contributors'],
+            ['No experience with government or public sector environments; legislative timelines and procurement realities are completely unfamiliar','Some exposure to public sector context but hasn\'t operated in a government affairs or policy environment; legislative calendar constraints are unfamiliar','Understands how legislative sessions work, what shapes procurement timelines, and how state education and health agency decisions get made; can navigate the pace without external coaching','Has operated in a government affairs or public sector context; comfortable navigating multi-state legislative environments and building systems around government timelines','Has managed legislative operations across 10+ active states simultaneously; deep understanding of how session calendars, budget cycles, and agency relationships shape GR strategy'],
+            ['Either moves too fast for the political environment (creating relationship damage) or too slowly for a startup\'s operational needs; cannot hold both simultaneously','Understands the tension conceptually but struggles to maintain startup execution pace when waiting for legislative outcomes','Maintains startup-level execution discipline on the operational side (tracker maintenance, brief production, coordination) while not conflating operational output with legislative progress','Comfortable holding both timelines simultaneously; builds operational urgency into the GR function without applying inappropriate pressure to the political process','Has built a GR operations rhythm at a startup that delivers operational output at startup speed while managing the team\'s expectations around the inherent patience government affairs requires'],
+            ['Views GR as a government contracting function without connection to the student mental health outcomes the policy is meant to enable','Understands the mission but can\'t articulate how GR operations work contributes to outcomes for underserved youth','Can connect their GR operations work to the legislative outcomes that enable Cartwheel to serve more students; mission is a motivating frame, not just a talking point','Genuine belief in student mental health policy is visible in how they approach their work; produces briefs and manages collateral with authentic advocacy orientation','Has built GR operations for a social impact organization specifically because they care about the population; brings authentic policy advocacy investment to what would otherwise be a purely operational role'],
+          ]
+        }
+      },
+      {
+        title: 'VP of Government Relations',
+        items: [
+          'Existing legislative credibility in education and health policy is a hard requirement',
+          'State contract negotiation and legislative strategy ownership across active expansion markets',
+          'Manages GR Account Executive team; builds the GR function from Series B through scale',
+          'Depth in active Cartwheel states (AZ, GA, MA, NY, PA, IN, WI, NC, NV, IL, CO, OH, RI) required',
+        ],
+        scorecard: {
+          rationale: 'Policy operations infrastructure weighted highest because at Series B the VP is building the GR function — not just executing in it; the ability to design repeatable infrastructure while simultaneously maintaining legislative relationships is the hardest combination to find, and it\'s what Cartwheel\'s GR function needs to scale.',
+          anchors: [
+            ['Has operated in government affairs without building infrastructure; the function depends on tribal knowledge rather than repeatable systems','Has relied on support staff to build GR infrastructure; hasn\'t personally designed or owned the intelligence and tracking systems','Has built or overseen a GR intelligence function; can define what good GR infrastructure looks like and delegate its construction','Has personally designed and overseen a comprehensive GR intelligence infrastructure for a multi-state advocacy program; the system survives leadership transitions','Has built a government affairs function from the ground up — intelligence infrastructure, lobbyist management frameworks, collateral systems, and state opportunity tracking — that scaled from 3 states to 15+'],
+            ['Delegates all legislative communication without providing strategic direction; materials lack coherent narrative or sufficient impact evidence','Reviews and approves materials but doesn\'t drive the messaging strategy; legislative communication is reactive rather than proactive','Owns the legislative communication strategy; can define the narrative, delegate production, and ensure consistency across states and lobbyist partners','Has developed a legislative communication approach that advances Cartwheel\'s policy agenda in multiple states simultaneously; messaging is proactive and shapes legislative opinion rather than responding to it','Has created a legislative communication infrastructure and narrative that changed the policy environment — legislators who were neutral or opposed changed their position based on Cartwheel\'s impact evidence and advocacy'],
+            ['Manages lobbyist relationships reactively; doesn\'t drive accountability, and internal teams aren\'t aligned on GR priorities','Maintains lobbyist relationships but doesn\'t build accountability frameworks or proactively align internal teams on GR strategy','Manages a GR Account Executive team and external lobbyist relationships with accountability; internal teams are generally aligned on GR priorities and deliverables','Has built a GR Account Executive team with defined accountabilities, managed lobbyist performance to contract, and maintained deep alignment with Marketing, Data, and GTM on GR strategy','Has built and scaled an entire government affairs function — internal team, external lobbyist network, cross-functional alignment protocols, and accountability frameworks — from scratch; the function is operationally excellent and strategically coherent'],
+            ['Does not have existing legislative credibility or state-level policy relationships in education or health; ineligible for this role','Has policy background but relationships are not in Cartwheel\'s active state markets or are in adjacent but non-qualifying policy domains','Has some existing policy relationships in Cartwheel\'s active states; can open legislative doors even if the relationships are not yet at decision-maker level','Has established legislative credibility in education or health policy in multiple active Cartwheel states; legislators and agency staff recognize and receive their calls','Has built and maintained high-trust legislative relationships with education committee chairs, Medicaid agency leaders, and school superintendent networks across 8+ active Cartwheel states; their personal credibility is a material competitive advantage'],
+            ['Cannot calibrate speed to environment; either over-pressures the political process or under-delivers on the startup\'s operational expectations','More comfortable on one side of the tension; either a strong startup operator who struggles with government timelines or a government relations veteran who moves too slowly for a scaling company','Has navigated the startup/government timeline tension in a prior role; doesn\'t conflate operational output with legislative progress and doesn\'t let political patience become organizational inertia','Thrives in this specific tension; maintains a high-output GR operations cadence while managing the team\'s understanding of what drives legislative change','Has built a government affairs function at a startup that delivered both startup-level operational productivity and government-calibrated relationship outcomes simultaneously; the function is cited as a model for how to do GR at a growth-stage health or education company'],
+            ['Approaches GR as a contracting and lobbying strategy function; legislators can tell the advocacy is performative','Mission-connected but legislators perceive the advocacy as primarily commercially motivated','Genuine advocacy for student mental health is visible in how they approach legislative relationships; legislators engage because the mission resonates','Mission conviction is a credibility asset in legislative relationships; agency staff and legislators engage more deeply because of their authentic belief in the work','Is known in education and health policy circles as a genuine advocate for underserved youth mental health — not a hired gun; their reputation as an authentic voice is itself a Cartwheel competitive advantage'],
+          ]
+        }
+      }
+    ]
+  },
+  {
+    id: 'ga',
+    label: 'G&A',
+    color: '#4A5E50',
+    bg: '#F4F6F4',
+    title: 'General & Administrative',
+    sub: 'Provides the operational and administrative backbone that keeps Cartwheel running — legal, compliance, IT, and executive operations',
+    criteria: [
+      { name: 'Operational Excellence & Process Rigor', def: 'Builds and maintains administrative infrastructure — vendor contracts, compliance workflows, IT systems, office operations — with precision and follow-through. Creates order from ambiguity.', wt: '25%', tags: ['u2','fn'], labels: ['U2 Builder','Function-specific'], uids: ['u2'], tip: 'Captures U2 Builder\'s Mindset — G&A at a Series B means creating administrative infrastructure from scratch. Candidates who need defined systems to be effective will find themselves blocked at every turn in a rapidly scaling environment.' },
+      { name: 'Cross-Functional Service & Stakeholder Support', def: 'Serves every department as an internal resource. Anticipates needs, removes friction, and operates proactively — not just when asked.', wt: '22%', tags: ['u4','fn'], labels: ['U4 Cross-Functional','Function-specific'], uids: ['u4'], tip: 'Captures U4 Cross-Functional Instinct — G&A is the operational substrate that every other team runs on. Reactive support mode (only solving problems when escalated) is the failure mode. G&A candidates who have partnered across clinical, finance, and engineering simultaneously stand out.' },
+      { name: 'Vendor & Contract Management', def: 'Manages vendor relationships, contract terms, SLA accountability, and renewal cycles across multiple suppliers. Protects Cartwheel\'s interests without creating bottlenecks.', wt: '20%', tags: ['fn'], labels: ['Function-specific only'], uids: [], tip: 'Function-specific only — vendor and contract management in a healthcare company carries regulatory and risk dimensions that general ops experience doesn\'t fully address. For legal/compliance roles, this extends to employment agreements, NDAs, and BAAs.' },
+      { name: 'Communication & Documentation Clarity', def: 'Produces clear written communications across audiences — executive briefings, legal summaries, vendor correspondence, and internal policies. Precision and accessibility in the same document.', wt: '18%', tags: ['u3'], labels: ['U3 Communication'], uids: ['u3'], tip: 'Captures U3 Communication Across Audiences — G&A roles produce materials for a wide range of readers: board members, employees, regulators, and vendors. The ability to translate complexity into clear, accessible language is a shared requirement across all G&A sub-functions.' },
+      { name: 'Mission Alignment', def: 'Genuine belief that enabling Cartwheel\'s operational health is meaningful work. Not just looking for a stable admin role at a healthcare company.', wt: '10%', tags: ['sa'], labels: ['U1 Mission — standalone'], uids: ['u1'], tip: 'U1 standalone — mission alignment in G&A is a retention signal more than a performance variable. G&A team members who are not connected to the mission are more susceptible to competing offers from higher-comp administrative environments.' },
+      { name: 'Startup Administrative Adaptability', def: 'Comfortable with incomplete policy, ambiguous scope, and rapidly changing priorities. Builds administrative clarity without slowing the business down.', wt: '5%', tags: ['u5'], labels: ['U5 Ambiguity'], uids: ['u5'], tip: 'Captures U5 Startup Ambiguity Fit — at a Series B, G&A team members often encounter gaps in policy, undefined processes, and competing urgent requests simultaneously. The ability to prioritize and execute without waiting for perfect information is a differentiator.' },
+    ],
+    roles: [
+      {
+        title: 'Executive Assistant / Chief of Staff',
+        items: [
+          'Executive calendar and logistics ownership: manages competing priorities across multiple leaders without losing context',
+          'Project tracking: maintains action items, deadlines, and stakeholder communications across strategic initiatives',
+          'Internal communications drafting: writes on behalf of leadership for all-hands, board updates, and company announcements',
+          'Operates as a force multiplier — routes decisions to the right people and prevents unnecessary exec escalations',
+        ],
+        scorecard: {
+          rationale: 'Operational excellence and process rigor weighted highest because the primary function of an EA/CoS at Cartwheel is to increase leadership throughput — calendar management, project tracking, and logistics infrastructure are the direct levers; without that foundation, the role cannot serve as a force multiplier.',
+          anchors: [
+            ['Calendar management is reactive; action items are missed, project tracking is informal, and priorities aren\'t managed systematically across leaders','Maintains reasonable calendar and logistics management but project tracking is inconsistent and action items require reminders','Manages complex multi-leader calendars without dropping priorities; project tracking is consistent and action items are followed through without being asked','Has built and maintains a comprehensive executive operations system — calendar management, project tracking, stakeholder communication workflows, and logistics infrastructure — that executives rely on as a force multiplier','Has designed an executive operations infrastructure that measurably increases the throughput of a C-suite team; the infrastructure is systematic, not person-dependent, and scales as the leadership team grows'],
+            ['Reactive and scope-limited; serves only the executives they support and doesn\'t engage cross-functionally without being asked','Available and responsive across the organization but doesn\'t anticipate needs or proactively route decisions','Anticipates common needs and proactively routes decisions to the right people; most departments see the EA/CoS as a reliable resource, not an obstacle','Serves as a trusted organizational navigator; prevents unnecessary escalations, routes work to the right owners, and is known across the organization as the person who makes things move','Has served as a force multiplier for a C-suite at a scaling startup — measurably reducing executive cognitive load, improving decision routing, and enabling leadership to focus on the highest-leverage decisions'],
+            ['Vendor management is reactive; contracts renew automatically, SLAs aren\'t tracked, and vendor issues get escalated to legal or finance without context','Tracks renewal dates and escalates issues but doesn\'t proactively manage vendor relationships or evaluate vendor performance against SLAs','Maintains vendor contract tracking; renewal dates are flagged in advance, vendor correspondence is accurate and professional, and issues are escalated with context','Proactively manages vendor relationships and contracts; negotiates renewals with preparation, tracks SLA compliance, and protects the company\'s interests without creating bottlenecks','Has designed and maintained a complete vendor management system for a scaling startup — contract tracking, renewal workflows, SLA accountability, and vendor performance reviews — without legal or finance needing to chase vendors directly'],
+            ['Written communications require significant editing before they can be used; tone, audience calibration, and accuracy are inconsistent','Produces functional written communications but they don\'t match executive voice or require consistent revision before use','Can produce accurate, appropriately-toned communications for executive use; leadership can send with light editing','Writes communications across audiences — board updates, all-hands, vendor correspondence, and internal announcements — in the executive\'s voice; materials are routinely used without substantive editing','Has ghost-written and managed a C-suite communication calendar — all-hands, board presentations, investor updates, company announcements, and external media — as the primary communication infrastructure for the leadership team'],
+            ['Views the role as administrative support at a healthcare company; cannot articulate how operational excellence enables youth mental health outcomes','Understands the mission but organizational work is motivated by professional development, not mission connection','Connects their operational work to Cartwheel\'s mission; can articulate why enabling leadership capacity matters for the students and families being served','Mission is visible in how they approach their work; proactively connects operational priorities to clinical outcomes in how they communicate with leadership and the organization','Has chosen to build a career in executive operations specifically at mission-driven healthcare or education organizations because they care; the mission shapes how they prioritize and what they invest in beyond the job description'],
+            ['Requires defined role scope, stable organizational structure, and established processes to perform; breaks down when priorities shift rapidly','Can manage moderate ambiguity but needs clarity on role scope before acting; waits to be told rather than creating structure','Has operated effectively in a startup administrative role where policy was being built, org structure was changing, and priorities shifted rapidly; created structure and kept moving','Thrives in ambiguous administrative environments; builds processes for the organization while simultaneously executing against current needs','Has served as the organizational backbone for a scaling startup during its most ambiguous growth phase — when processes didn\'t exist, priorities were shifting daily, and leadership needed someone who created clarity rather than waiting for it'],
+          ]
+        }
+      },
+      {
+        title: 'Legal & Compliance',
+        items: [
+          'Contract review and redline: NDAs, BAAs, vendor agreements, and school district contracts — healthcare and education contracting experience required',
+          'Regulatory compliance oversight: HIPAA, FERPA, state telehealth regulations, Medicaid billing compliance',
+          'Risk identification: proactively flags legal exposure before it becomes an incident',
+          'Policy development: drafts internal policies (privacy, data governance, acceptable use) as Cartwheel scales into new states',
+        ],
+        scorecard: {
+          rationale: 'Operational excellence and process rigor weighted highest because a legal and compliance function without systematic infrastructure requires constant reinvention — contract playbooks, compliance frameworks, and policy documentation are the foundation that enables the function to scale without proportional headcount growth.',
+          anchors: [
+            ['Legal and compliance work is reactive; contracts are reviewed case-by-case without a framework, policies are outdated, and regulatory requirements are tracked informally','Handles routine legal and compliance tasks consistently but hasn\'t built systematic frameworks; each contract review is a custom effort','Has built or maintains a basic legal operations infrastructure — contract review frameworks, compliance checklists, and policy documentation — that the organization can rely on','Has designed a legal operations infrastructure — NDAs, BAAs, vendor agreement frameworks, regulatory compliance tracking, and internal policy documentation — that scales with the company\'s growth','Has built a complete legal and compliance function from scratch for a healthcare startup — contract playbooks, regulatory compliance frameworks, HIPAA and FERPA governance, and policy development protocols — that survived external audit and informed Series B diligence materials'],
+            ['Legal and compliance support is reactive and siloed; department leaders work around the legal function rather than through it','Available to answer legal questions but doesn\'t proactively identify regulatory risks or partner with departments on compliance requirements','Regularly advises multiple departments on legal and compliance requirements; department leaders know to involve legal before decisions with regulatory implications, not after','Serves as a proactive legal partner across the organization; identifies regulatory exposure before it becomes an incident and builds compliance infrastructure into cross-functional workflows','Has built a legal partnership model for a healthcare startup where department leaders treat legal as a strategic resource rather than a bottleneck; the legal function is embedded in clinical, product, and finance decision-making'],
+            ['Contract review is slow, generic, and produces redlines that don\'t reflect healthcare-specific risk; BAA requirements are not consistently applied','Can review standard contracts but healthcare-specific agreements — BAAs, Medicaid participation agreements, school district contracts — require external legal support','Reviews and redlines standard healthcare contracts independently — NDAs, BAAs, and vendor agreements — with appropriate risk identification and negotiating positions','Independently manages the full contract lifecycle for a healthcare company — including school district contracts, payer agreements, and vendor NDAs — with appropriate risk stratification and negotiating discipline','Has managed healthcare contract operations for a multi-state organization — school district master agreements, Medicaid payer participation, BAAs, and vendor contracts — with a contract playbook that enables self-service review for routine agreements'],
+            ['Legal communications are written for other lawyers; business stakeholders cannot understand the guidance or act on it without interpretation','Can produce clear legal summaries with coaching but defaults to legal language that creates friction for non-legal readers','Writes legal guidance that business stakeholders can understand and act on; policies and memos are accessible without being imprecise','Produces legal and compliance communications — regulatory summaries, policy drafts, board risk memos, and vendor correspondence — that are accessible, precise, and decision-enabling for non-legal audiences','Has built a legal communication standard for a healthcare startup that enabled business leaders to make legally-informed decisions independently; the legal team is seen as making the organization more capable, not just more compliant'],
+            ['Views healthcare legal and compliance as a risk mitigation function without connection to the mission; HIPAA is just a checkbox','Understands the mission but legal and compliance decisions are made purely on risk optimization without considering access or mission implications','Can articulate how HIPAA, FERPA, and telehealth compliance enable — rather than just constrain — Cartwheel\'s ability to serve students; mission is a motivating frame for compliance work','Legal and compliance decisions are made with explicit consideration of how they affect Cartwheel\'s ability to serve under-resourced students; compliance infrastructure is built to enable access, not just reduce risk','Has built a healthcare compliance framework specifically designed to enable access for underserved youth — balancing regulatory requirements with the practical reality of school-based care delivery — because they care about the population, not just the company\'s legal exposure'],
+            ['Requires established legal policies and a mature compliance function; doesn\'t perform well when regulation is ambiguous or policy doesn\'t exist yet','Can operate in ambiguity on low-stakes legal questions but needs external counsel for anything complex without an established framework','Has built legal and compliance infrastructure at a company without prior frameworks; comfortable creating policy in areas where regulation is evolving, with appropriate external counsel involvement','Thrives in regulatory ambiguity; builds frameworks for multi-state compliance, telehealth regulation, and Medicaid participation in areas where definitive guidance is incomplete','Has built healthcare legal and compliance infrastructure for a company operating in multiple states with evolving telehealth and Medicaid regulations — without external counsel dependence — that the organization ran on through Series B'],
+          ]
+        }
+      }
+    ]
+  },
+];
+
+const TAG_STYLES = {
+  u1: 'tag-u1', u2: 'tag-u2', u3: 'tag-u3', u4: 'tag-u4', u5: 'tag-u5', fn: 'tag-fn', sa: 'tag-sa'
+};
+
+const UNIVERSALS = [
+  { name: 'Mission Conviction', pct: '~15–20%' },
+  { name: 'Builder\'s Mindset', pct: '~15–20%' },
+  { name: 'Communication Across Audiences', pct: '~15–20%' },
+  { name: 'Cross-Functional Instinct', pct: '~15–20%' },
+  { name: 'Startup Ambiguity Fit', pct: '~15–20%' },
+];
+
+let active = null;
+let currentId = FUNCTIONS[0].id;
+let selectedRole = 0;
+
+function buildSelect() {
+  const sel = document.getElementById('funcFilter');
+  FUNCTIONS.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.id;
+    opt.textContent = f.label;
+    sel.appendChild(opt);
+  });
+}
+
+function renderFunction(id) {
+  const f = FUNCTIONS.find(x => x.id === id);
+  if (!f) return;
+  currentId = id;
+  active = null;
+  selectedRole = 0;
+
+  // Layer 2: department criteria card
+  const col = document.getElementById('funcCol');
+  col.innerHTML = `
+    <div class="func-card">
+      <div class="func-header" style="border-top:3px solid ${f.color}; border-bottom:1px solid #E4E0DC; padding:13px 16px 11px;">
+        <div class="func-title">${f.title}</div>
+        <div class="func-sub">${f.sub}</div>
+      </div>
+      <div class="func-body">
+        ${f.criteria.map(c => `
+          <div class="crit" data-uids="${c.uids.join(' ')}" style="border-left:3px solid ${f.color}; background:${f.bg};">
+            <div class="crit-name">${c.name}</div>
+            <div class="crit-def">${c.def}</div>
+            <div class="crit-wt" style="color:${f.color}">${c.wt}</div>
+            <div class="tags">${c.tags.map((t,i) => `<span class="tag ${TAG_STYLES[t] || 'tag-fn'}">${c.labels[i]}</span>`).join('')}</div>
+            <div class="tooltip"><strong>${c.name}</strong>${c.tip}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+
+  renderL3(f);
+  render();
+}
+
+function renderL3(f) {
+  const role = f.roles[selectedRole];
+  const totalCount = UNIVERSALS.length + f.criteria.length + role.items.length;
+  const l3 = document.getElementById('l3Col');
+
+  // Build role tabs (only if more than one role)
+  const tabsHtml = f.roles.length > 1 ? `
+    <div class="role-tabs">
+      ${f.roles.map((r, i) => `
+        <div class="role-tab" onclick="selectRole(${i})"
+          style="${i === selectedRole
+            ? `background:${f.color}; color:#fff; border-color:${f.color};`
+            : `background:#fff; color:${f.color}; border-color:${f.color}55;`}">
+          ${r.title}
+        </div>
+      `).join('')}
+    </div>` : `<div style="margin-bottom:12px; font-size:12px; font-weight:600; color:${f.color};">${role.title}</div>`;
+
+  l3.innerHTML = tabsHtml + `
+    <div class="assembled" style="border-color:${f.color}44;">
+      <div class="assembled-head" style="background:${f.color}08; border-bottom:1px solid ${f.color}20;">
+        <div>
+          <div class="assembled-title">Assembled scorecard &nbsp;·&nbsp; <span style="color:${f.color}">${role.title}</span></div>
+          <div class="assembled-sub">Every criterion that appears in this role's Gem scorecard</div>
+        </div>
+        <div class="assembled-count">${UNIVERSALS.length} + ${f.criteria.length} + ${role.items.length} = ${totalCount} total</div>
+      </div>
+
+      <div class="assembled-section">
+        <div class="assembled-section-head" style="background:#394B9912; border-bottom:1px solid #394B9920;">
+          <div class="assembled-layer-badge" style="background:#394B99; color:#fff;">L1</div>
+          <div class="assembled-section-title">Cartwheel-wide &nbsp;·&nbsp; Always present &nbsp;·&nbsp; Every role</div>
+        </div>
+        <div class="assembled-items">
+          ${UNIVERSALS.map(u => `
+            <div class="assembled-item">
+              <span class="assembled-item-name">${u.name}</span>
+              <span class="assembled-pct">${u.pct}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="assembled-section">
+        <div class="assembled-section-head" style="background:${f.color}10; border-bottom:1px solid ${f.color}20;">
+          <div class="assembled-layer-badge" style="background:${f.color}; color:#fff;">L2</div>
+          <div class="assembled-section-title">${f.title} &nbsp;·&nbsp; All team members in this dept</div>
+        </div>
+        <div class="assembled-items">
+          ${f.criteria.map(c => `
+            <div class="assembled-item">
+              <span class="assembled-item-name">${c.name}</span>
+              <span class="assembled-pct">${c.wt}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="assembled-section">
+        <div class="assembled-section-head" style="background:${f.color}06; border-bottom:1px solid ${f.color}18;">
+          <div class="assembled-layer-badge" style="background:${f.color}22; color:${f.color};">L3</div>
+          <div class="assembled-section-title">${role.title} only &nbsp;·&nbsp; This req</div>
+        </div>
+        <div class="assembled-items">
+          ${role.items.map(item => `
+            <div class="assembled-item assembled-l3-item">
+              <span class="assembled-item-name">${item}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+    ${role.scorecard ? buildGemPanel(f, role) : ''}`;
+}
+
+const RATING_LABELS = ['Significant Concern','Below Bar','Meets Bar','Strong','Exceptional'];
+
+function buildGemPanel(f, role) {
+  const sc = role.scorecard;
+  return `
+    <div class="gem-panel">
+      <div class="gem-panel-head">
+        <div class="gem-panel-title">
+          Gem Scorecard &nbsp;·&nbsp; <span style="color:${f.color}">${role.title}</span>
+          <span class="gem-panel-hint">Gem-ready · 1–5 rubric</span>
+        </div>
+        <div class="gem-panel-rationale">⚖️ ${sc.rationale}</div>
+      </div>
+      ${f.criteria.map((c, ci) => {
+        const anchors = sc.anchors[ci] || [];
+        return `
+        <div class="gem-criterion">
+          <div class="gem-criterion-head">
+            <span class="gem-criterion-name">${c.name}</span>
+            <span class="gem-criterion-wt" style="color:${f.color}">${c.wt}</span>
+          </div>
+          <table class="gem-rubric">
+            ${[5,4,3,2,1].map(r => {
+              const idx = r - 1;
+              const cls = `r${r}`;
+              return `<tr>
+                <td class="${cls}">${r}</td>
+                <td class="${cls}">${RATING_LABELS[idx]}</td>
+                <td>${anchors[idx] || ''}</td>
+              </tr>`;
+            }).join('')}
+          </table>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function selectRole(idx) {
+  selectedRole = idx;
+  const f = FUNCTIONS.find(x => x.id === currentId);
+  if (f) renderL3(f);
+}
+
+function filterFunction(val) {
+  renderFunction(val);
+}
+
+function toggle(uid) {
+  active = active === uid ? null : uid;
+  render();
+}
+
+function render() {
+  document.querySelectorAll('.u-card').forEach(card => {
+    const uid = card.dataset.uid;
+    card.classList.remove('active','dimmed');
+    if (active) card.classList.add(uid === active ? 'active' : 'dimmed');
+  });
+  document.querySelectorAll('.crit').forEach(crit => {
+    const uids = (crit.dataset.uids || '').trim().split(/\s+/).filter(Boolean);
+    crit.classList.toggle('dimmed', !!(active && !uids.includes(active)));
+  });
+}
+
+buildSelect();
+renderFunction(FUNCTIONS[0].id);
+</script>
+</body>
+</html>
