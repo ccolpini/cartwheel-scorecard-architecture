@@ -120,6 +120,27 @@ body { background: #F0ECE9; font-family: 'Inter', system-ui, sans-serif; color: 
 .callout h3 { font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: #394B99; margin-bottom: 8px; }
 .callout p { font-size: 12px; color: #9C9283; line-height: 1.6; }
 .footer { text-align: center; font-size: 11px; color: #9C9283; padding: 20px 0 30px; }
+/* Search */
+.search-wrap { position: relative; margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.search-wrap label { font-size: 12px; font-weight: 600; color: #9C9283; text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
+.search-input { font-family: 'Inter', sans-serif; font-size: 13px; color: #0F1B1F; background: #F0ECE9; border: 1.5px solid #E4E0DC; border-radius: 6px; padding: 7px 13px 7px 32px; outline: none; width: 260px; transition: border-color .15s, width .2s; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%239C9283' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='6' cy='6' r='4.5'/%3E%3Cline x1='9.5' y1='9.5' x2='13' y2='13'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 10px center; }
+.search-input:focus { border-color: #394B99; width: 320px; }
+.search-input::placeholder { color: #B5ADA4; font-weight: 400; }
+.search-kbd { font-size: 10px; font-weight: 600; color: #B5ADA4; background: #E4E0DC; border-radius: 4px; padding: 2px 6px; pointer-events: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+.search-results { position: absolute; top: calc(100% + 6px); right: 0; width: 420px; max-height: 440px; overflow-y: auto; background: #fff; border: 1.5px solid #E4E0DC; border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.12); z-index: 200; display: none; }
+.search-results.open { display: block; }
+.sr-group { border-bottom: 1px solid #F0ECE9; }
+.sr-group:last-child { border-bottom: none; }
+.sr-group-head { padding: 9px 14px 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #9C9283; display: flex; align-items: center; gap: 8px; position: sticky; top: 0; background: #fff; z-index: 1; }
+.sr-group-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.sr-item { padding: 7px 14px 7px 28px; cursor: pointer; transition: background .1s; display: flex; flex-direction: column; gap: 2px; }
+.sr-item:hover { background: #F5F2EF; }
+.sr-item-name { font-size: 12px; font-weight: 600; color: #0F1B1F; }
+.sr-item-context { font-size: 11px; color: #9C9283; line-height: 1.4; }
+.sr-item-badge { font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 10px; background: #F0ECE9; color: #9C9283; display: inline-block; margin-top: 2px; align-self: flex-start; }
+.sr-empty { padding: 20px 14px; text-align: center; font-size: 12px; color: #9C9283; }
+.sr-count { font-size: 11px; color: #9C9283; padding: 8px 14px; text-align: center; border-top: 1px solid #F0ECE9; }
+mark.search-hl { background: #FEF08A; color: inherit; border-radius: 2px; padding: 0 1px; }
 </style>
 </head>
 <body>
@@ -140,6 +161,12 @@ body { background: #F0ECE9; font-family: 'Inter', system-ui, sans-serif; color: 
   <div class="filter-wrap">
     <label for="funcFilter">Department</label>
     <select id="funcFilter" onchange="filterFunction(this.value)"></select>
+  </div>
+  <div class="search-wrap">
+    <label for="searchInput">Search</label>
+    <input type="text" id="searchInput" class="search-input" placeholder="Criteria, roles, rubrics…" autocomplete="off" />
+    <span class="search-kbd" id="searchKbd">⌘K</span>
+    <div class="search-results" id="searchResults"></div>
   </div>
 </div>
 
@@ -1021,6 +1048,206 @@ function render() {
     crit.classList.toggle('dimmed', !!(active && !uids.includes(active)));
   });
 }
+
+/* ── Search engine ── */
+function buildSearchIndex() {
+  const entries = [];
+  FUNCTIONS.forEach(f => {
+    // Department-level criteria (Layer 2)
+    f.criteria.forEach(c => {
+      entries.push({
+        type: 'criterion',
+        deptId: f.id,
+        deptLabel: f.label,
+        deptColor: f.color,
+        name: c.name,
+        text: [c.name, c.def, c.tip].join(' '),
+        context: c.def,
+        roleIdx: null
+      });
+    });
+    // Roles and role items (Layer 3)
+    f.roles.forEach((r, ri) => {
+      entries.push({
+        type: 'role',
+        deptId: f.id,
+        deptLabel: f.label,
+        deptColor: f.color,
+        name: r.title,
+        text: [r.title, ...r.items].join(' '),
+        context: r.items[0] || '',
+        roleIdx: ri
+      });
+      // Rubric anchors if scorecard exists
+      if (r.scorecard) {
+        (r.scorecard.anchors || []).forEach((anchorSet, ai) => {
+          const critName = f.criteria[ai] ? f.criteria[ai].name : '';
+          anchorSet.forEach(anchor => {
+            if (!anchor) return;
+            entries.push({
+              type: 'rubric',
+              deptId: f.id,
+              deptLabel: f.label,
+              deptColor: f.color,
+              name: critName + ' — ' + r.title,
+              text: [critName, r.title, anchor].join(' '),
+              context: anchor.length > 90 ? anchor.slice(0, 90) + '…' : anchor,
+              roleIdx: ri
+            });
+          });
+        });
+      }
+    });
+  });
+  return entries;
+}
+
+const searchIndex = buildSearchIndex();
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+const searchKbd = document.getElementById('searchKbd');
+
+// Detect Mac vs PC for keyboard shortcut hint
+if (!/Mac|iPod|iPhone|iPad/.test(navigator.platform)) searchKbd.textContent = 'Ctrl+K';
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function highlightMatch(text, terms) {
+  let safe = escapeHtml(text);
+  terms.forEach(t => {
+    const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    safe = safe.replace(re, '<mark class="search-hl">$1</mark>');
+  });
+  return safe;
+}
+
+let searchTimeout = null;
+
+searchInput.addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => runSearch(this.value), 120);
+});
+
+searchInput.addEventListener('focus', function() {
+  if (this.value.trim().length >= 2) runSearch(this.value);
+});
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-wrap')) searchResults.classList.remove('open');
+});
+
+function runSearch(query) {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) { searchResults.classList.remove('open'); return; }
+
+  const terms = q.split(/\s+/).filter(t => t.length >= 2);
+  if (!terms.length) { searchResults.classList.remove('open'); return; }
+
+  const matches = searchIndex.filter(entry => {
+    const lower = entry.text.toLowerCase();
+    return terms.every(t => lower.includes(t));
+  });
+
+  if (!matches.length) {
+    searchResults.innerHTML = '<div class="sr-empty">No results found</div>';
+    searchResults.classList.add('open');
+    return;
+  }
+
+  // Group by department
+  const grouped = {};
+  matches.forEach(m => {
+    if (!grouped[m.deptId]) grouped[m.deptId] = { label: m.deptLabel, color: m.deptColor, items: [] };
+    grouped[m.deptId].items.push(m);
+  });
+
+  const typeLabels = { criterion: 'L2 Criterion', role: 'L3 Role', rubric: 'Rubric' };
+  let html = '';
+  let total = 0;
+  Object.keys(grouped).forEach(deptId => {
+    const g = grouped[deptId];
+    html += `<div class="sr-group">
+      <div class="sr-group-head"><div class="sr-group-swatch" style="background:${g.color}"></div>${escapeHtml(g.label)}</div>`;
+    g.items.slice(0, 8).forEach(m => {
+      total++;
+      html += `<div class="sr-item" data-dept="${m.deptId}" data-role="${m.roleIdx !== null ? m.roleIdx : ''}" onclick="navigateResult(this)">
+        <div class="sr-item-name">${highlightMatch(m.name, terms)}</div>
+        <div class="sr-item-context">${highlightMatch(m.context.slice(0, 120), terms)}</div>
+        <span class="sr-item-badge">${typeLabels[m.type] || m.type}</span>
+      </div>`;
+    });
+    if (g.items.length > 8) html += `<div class="sr-item-context" style="padding:4px 28px 8px;font-style:italic;">+${g.items.length - 8} more in ${escapeHtml(g.label)}</div>`;
+    html += '</div>';
+  });
+
+  html += `<div class="sr-count">${matches.length} result${matches.length !== 1 ? 's' : ''} across ${Object.keys(grouped).length} department${Object.keys(grouped).length !== 1 ? 's' : ''}</div>`;
+  searchResults.innerHTML = html;
+  searchResults.classList.add('open');
+}
+
+function navigateResult(el) {
+  const deptId = el.dataset.dept;
+  const roleIdx = el.dataset.role;
+
+  // Switch to the department
+  document.getElementById('funcFilter').value = deptId;
+  filterFunction(deptId);
+
+  // Switch to the role tab if specified
+  if (roleIdx !== '') {
+    selectedRole = parseInt(roleIdx, 10);
+    const f = FUNCTIONS.find(x => x.id === deptId);
+    if (f) renderL3(f);
+  }
+
+  searchResults.classList.remove('open');
+
+  // Highlight matching text in the visible view
+  highlightVisibleMatches(searchInput.value.trim());
+}
+
+function highlightVisibleMatches(query) {
+  if (!query || query.length < 2) return;
+  const terms = query.toLowerCase().split(/\s+/).filter(t => t.length >= 2);
+  if (!terms.length) return;
+
+  // Clear any previous highlights
+  document.querySelectorAll('mark.search-hl').forEach(m => {
+    m.replaceWith(m.textContent);
+  });
+
+  const targets = document.querySelectorAll('.crit-name, .crit-def, .assembled-item-name, .gem-criterion-name, .gem-rubric td:last-child');
+  targets.forEach(el => {
+    const text = el.textContent;
+    const lower = text.toLowerCase();
+    if (!terms.some(t => lower.includes(t))) return;
+    el.innerHTML = highlightMatch(text, terms);
+  });
+
+  // Scroll to the first highlight
+  const firstHl = document.querySelector('mark.search-hl');
+  if (firstHl) firstHl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // Auto-clear highlights after 4 seconds
+  setTimeout(() => {
+    document.querySelectorAll('mark.search-hl').forEach(m => m.replaceWith(m.textContent));
+  }, 4000);
+}
+
+// Keyboard shortcut: Cmd+K / Ctrl+K
+document.addEventListener('keydown', function(e) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    searchInput.focus();
+    searchInput.select();
+  }
+  if (e.key === 'Escape' && document.activeElement === searchInput) {
+    searchInput.blur();
+    searchResults.classList.remove('open');
+  }
+});
 
 buildSelect();
 renderFunction(FUNCTIONS[0].id);
